@@ -15,7 +15,7 @@ import { processJob } from "./processor.js";
 class UnusedCrm implements CrmWriteBackAdapter {
   readonly firmId = WOMBAT_FIRM_ID;
   readonly provider = "notion" as const;
-  async appendOpportunityRun(_run: OpportunityRun) {
+  async appendOpportunityRun(_run: OpportunityRun): Promise<{ pageId: string }> {
     throw new Error("CRM should not run on vault-only jobs");
   }
   async patchPropertySummary(): Promise<void> {

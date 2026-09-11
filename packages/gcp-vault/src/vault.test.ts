@@ -169,10 +169,20 @@ describe("GcpCredentialVault", () => {
       }),
     ).toBe("opaque-blob");
 
-    expect(redactSecrets({ password: "hunter2", totp_seed: "abc", jobId: "abc" })).toEqual({
+    expect(
+      redactSecrets({
+        password: "hunter2",
+        totp_seed: "abc",
+        secretId: "wombat-nab-broker-portal",
+        mfaMode: "totp_managed",
+        jobId: "job_totp",
+      }),
+    ).toEqual({
       password: "[redacted]",
       totp_seed: "[redacted]",
-      jobId: "abc",
+      secretId: "wombat-nab-broker-portal",
+      mfaMode: "totp_managed",
+      jobId: "job_totp",
     });
   });
 
