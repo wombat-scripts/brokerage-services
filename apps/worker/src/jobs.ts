@@ -26,7 +26,15 @@ export function newJob<TInput>(args: {
     updatedAt: now,
     input: args.input,
     artefacts: [],
-    audit: [createAuditEvent(args.requestedBy, "job.created", { kind: args.kind })],
+    audit: [
+      createAuditEvent({
+        actor: args.requestedBy,
+        action: "job.created",
+        firmId: WOMBAT_FIRM_ID,
+        requester: args.requestedBy,
+        detail: { kind: args.kind },
+      }),
+    ],
     subjectRefs: args.subjectRefs ?? {},
   };
 }

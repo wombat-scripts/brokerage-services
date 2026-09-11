@@ -1,6 +1,6 @@
 import {
+  appendJobAudit,
   computeLvr,
-  createAuditEvent,
   pricingLenderInputSchema,
   type Job,
   type PricingLenderInput,
@@ -80,13 +80,10 @@ export async function handlePricingLender(
     finishedAt: new Date().toISOString(),
     output,
     error: undefined,
-    audit: [
-      ...job.audit,
-      createAuditEvent("system", "job.succeeded", {
-        fixture: true,
-        currentRateSource: input.currentRateSource ?? "notion_loan",
-      }),
-    ],
+    audit: appendJobAudit(job, "system", "job.succeeded", {
+      fixture: true,
+      currentRateSource: input.currentRateSource ?? "notion_loan",
+    }),
   });
 }
 

@@ -47,6 +47,18 @@ describe("Prai × NAB fixture matrix_cell", () => {
     expect(pricing.status).toBe("succeeded");
     expect(matrix.status).toBe("succeeded");
     expect(matrix.firmId).toBe(WOMBAT_FIRM_ID);
+    for (const job of [valuation, pricing, matrix]) {
+      const created = job.audit.find((event) => event.action === "job.created");
+      const completed = job.audit.find(
+        (event) => event.action === "job.succeeded" || event.action === "writeback.applied",
+      );
+      expect(created?.firmId).toBe(WOMBAT_FIRM_ID);
+      expect(created?.requester).toBe("seat:andre");
+      expect(created?.detail).toMatchObject({ firm_id: WOMBAT_FIRM_ID, requester: "seat:andre" });
+      expect(completed?.firmId).toBe(WOMBAT_FIRM_ID);
+      expect(completed?.requester).toBe("seat:andre");
+      expect(completed?.detail).toMatchObject({ firm_id: WOMBAT_FIRM_ID, requester: "seat:andre" });
+    }
 
     const lvr = computeLvr(PRAI_NAB_FIXTURE.loanBalanceAud, PRAI_NAB_FIXTURE.valueAud);
     expect(lvr).toBeCloseTo(0.78, 2);

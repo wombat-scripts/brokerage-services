@@ -1,5 +1,10 @@
 import type { Job, JobStatus, OpportunityRun } from "@wombat/contracts";
-import { WOMBAT_FIRM_ID, assertWombatFirmId, resolveOpportunityRunStatus } from "@wombat/contracts";
+import {
+  WOMBAT_FIRM_ID,
+  assertJobAuditHasFirmScope,
+  assertWombatFirmId,
+  resolveOpportunityRunStatus,
+} from "@wombat/contracts";
 import type {
   BrokerageStore,
   JobStore,
@@ -13,6 +18,7 @@ class MemoryJobStore implements JobStore {
 
   async create(job: Job): Promise<Job> {
     assertWombatFirmId(job.firmId);
+    assertJobAuditHasFirmScope(job.audit);
     if (this.jobs.has(job.jobId)) {
       throw new Error(`job already exists: ${job.jobId}`);
     }
@@ -21,9 +27,11 @@ class MemoryJobStore implements JobStore {
     return structuredClone(stored);
   }
 
-  async get(jobId: string): Promise<Job | null> {
+  async get(jobId: string, firmId?: string): Promise<Job | null> {
     const job = this.jobs.get(jobId);
-    return job ? structuredClone(job) : null;
+    if (!job) return null;
+    if (firmId && job.firmId !== firmId) return null;
+    return structuredClone(job);
   }
 
   async update(job: Job): Promise<Job> {
@@ -31,6 +39,7 @@ class MemoryJobStore implements JobStore {
       throw new Error(`job not found: ${job.jobId}`);
     }
     assertWombatFirmId(job.firmId);
+    assertJobAuditHasFirmScope(job.audit);
     const stored: Job = { ...job, firmId: WOMBAT_FIRM_ID };
     this.jobs.set(job.jobId, structuredClone(stored));
     return structuredClone(stored);
@@ -66,9 +75,11 @@ class MemoryOpportunityRunStore implements OpportunityRunStore {
     return structuredClone(stored);
   }
 
-  async get(runId: string): Promise<OpportunityRun | null> {
+  async get(runId: string, firmId?: string): Promise<OpportunityRun | null> {
     const run = this.runs.get(runId);
-    return run ? structuredClone(run) : null;
+    if (!run) return null;
+    if (firmId && run.firmId !== firmId) return null;
+    return structuredClone(run);
   }
 
   async list(query: ListOpportunityRunsQuery): Promise<OpportunityRun[]> {

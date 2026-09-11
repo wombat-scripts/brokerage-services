@@ -1,4 +1,4 @@
-import { createAuditEvent, type CrmWriteBackAdapter, type Job } from "@wombat/contracts";
+import { appendJobAudit, type CrmWriteBackAdapter, type Job } from "@wombat/contracts";
 import type { BrokerageStore } from "@wombat/store";
 import { handleMatrixCell } from "./handlers/matrix-cell.js";
 import { handlePricingLender } from "./handlers/pricing-lender.js";
@@ -13,7 +13,7 @@ export async function processJob(
   const started = touchJob(job, {
     status: "running",
     startedAt: job.startedAt ?? new Date().toISOString(),
-    audit: [...job.audit, createAuditEvent("system", "job.started", { kind: job.kind })],
+    audit: appendJobAudit(job, "system", "job.started", { kind: job.kind }),
   });
   await store.jobs.update(started);
 
@@ -27,6 +27,7 @@ export async function processJob(
       status: "failed",
       finishedAt: new Date().toISOString(),
       error: { code: "JOB_FAILED", message, retryable: true },
+      audit: appendJobAudit(started, "system", "job.failed", { message }),
     });
     await store.jobs.update(failed);
     return failed;
@@ -54,6 +55,7 @@ async function dispatch(
           message: `Phase 1 does not run ${job.kind}`,
           retryable: false,
         },
+        audit: appendJobAudit(job, "system", "job.failed", { kind: job.kind }),
       });
   }
 }

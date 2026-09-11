@@ -6,7 +6,7 @@ export type {
   OpportunityRunStore,
 } from "./types.js";
 export { createMemoryStore } from "./memory.js";
-export { applyMigrations, createPgPool, createPostgresStore } from "./postgres.js";
+export { applyMigrations, createPgPool, createPostgresStore, resetPostgresData } from "./postgres.js";
 export type { PgQueryable } from "./postgres.js";
 export {
   PRAI_NAB_DESK_FIXTURE_IDS,

@@ -10,6 +10,7 @@ import {
 } from "@wombat/contracts";
 import type { BrokerageStore } from "@wombat/store";
 import { newJob, processJob } from "@wombat/worker";
+import { authorizeDeskRequest, type DeskAuthConfig } from "./auth.js";
 
 const createJobBodySchema = z.object({
   kind: jobKindSchema,
@@ -42,7 +43,34 @@ function jobLinkedToRun(
   return output?.opportunityRunId === run.runId;
 }
 
-export function createApi(store: BrokerageStore, crm?: CrmWriteBackAdapter) {
+async function createFirmJob(
+  store: BrokerageStore,
+  crm: CrmWriteBackAdapter | undefined,
+  body: z.infer<typeof createJobBodySchema>,
+) {
+  const input = {
+    ...body.input,
+    firmId: WOMBAT_FIRM_ID,
+  };
+  let job = await store.jobs.create(
+    newJob({
+      kind: body.kind,
+      requestedBy: body.requestedBy,
+      input,
+      subjectRefs: body.subjectRefs,
+    }),
+  );
+  if (process.env.INLINE_WORKER === "true" && crm) {
+    job = await processJob(job, store, crm);
+  }
+  return job;
+}
+
+export function createApi(
+  store: BrokerageStore,
+  crm?: CrmWriteBackAdapter,
+  auth: DeskAuthConfig = {},
+) {
   const app = new Hono();
 
   app.get("/health", (c) =>
@@ -53,32 +81,28 @@ export function createApi(store: BrokerageStore, crm?: CrmWriteBackAdapter) {
     }),
   );
 
+  app.use("*", async (c, next) => {
+    if (c.req.path === "/health") {
+      return next();
+    }
+    const authorized = authorizeDeskRequest(c, auth);
+    if (!authorized.ok) {
+      return c.json({ error: { message: authorized.message } }, authorized.status);
+    }
+    return next();
+  });
+
   app.post("/jobs", async (c) => {
     const parsed = createJobBodySchema.safeParse(await c.req.json());
     if (!parsed.success) {
       return c.json({ error: parsed.error.flatten() }, 400);
     }
-    const body = parsed.data;
-    const input = {
-      ...body.input,
-      firmId: WOMBAT_FIRM_ID,
-    };
-    let job = await store.jobs.create(
-      newJob({
-        kind: body.kind,
-        requestedBy: body.requestedBy,
-        input,
-        subjectRefs: body.subjectRefs,
-      }),
-    );
-    if (process.env.INLINE_WORKER === "true" && crm) {
-      job = await processJob(job, store, crm);
-    }
+    const job = await createFirmJob(store, crm, parsed.data);
     return c.json({ job }, 201);
   });
 
   app.get("/jobs/:jobId", async (c) => {
-    const job = await store.jobs.get(c.req.param("jobId"));
+    const job = await store.jobs.get(c.req.param("jobId"), WOMBAT_FIRM_ID);
     if (!job) {
       return c.json({ error: { message: "job not found" } }, 404);
     }
@@ -94,6 +118,22 @@ export function createApi(store: BrokerageStore, crm?: CrmWriteBackAdapter) {
       startedAt: job.startedAt,
       finishedAt: job.finishedAt,
     });
+  });
+
+  app.post("/v1/firms/:firmId/jobs", async (c) => {
+    const firmId = c.req.param("firmId");
+    if (!requireWombatFirm(firmId)) {
+      return c.json(firmNotFound(), 404);
+    }
+    const parsed = createJobBodySchema.safeParse(await c.req.json());
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.flatten() }, 400);
+    }
+    if (parsed.data.firmId && parsed.data.firmId !== firmId) {
+      return c.json({ error: { message: "firmId mismatch" } }, 400);
+    }
+    const job = await createFirmJob(store, crm, parsed.data);
+    return c.json({ firmId, job }, 201);
   });
 
   app.get("/v1/firms/:firmId/opportunity-runs", async (c) => {
@@ -120,8 +160,8 @@ export function createApi(store: BrokerageStore, crm?: CrmWriteBackAdapter) {
     if (!requireWombatFirm(firmId)) {
       return c.json(firmNotFound(), 404);
     }
-    const opportunityRun = await store.opportunityRuns.get(c.req.param("runId"));
-    if (!opportunityRun || opportunityRun.firmId !== firmId) {
+    const opportunityRun = await store.opportunityRuns.get(c.req.param("runId"), firmId);
+    if (!opportunityRun) {
       return c.json({ error: { message: "opportunity run not found" } }, 404);
     }
     return c.json({ firmId, opportunityRun });
@@ -140,9 +180,9 @@ export function createApi(store: BrokerageStore, crm?: CrmWriteBackAdapter) {
     }
     let jobs = await store.jobs.list({ firmId });
     if (parsed.data.runId) {
-      const run = await store.opportunityRuns.get(parsed.data.runId);
-      if (!run || run.firmId !== firmId) {
-        return c.json({ firmId, jobs: [] });
+      const run = await store.opportunityRuns.get(parsed.data.runId, firmId);
+      if (!run) {
+        return c.json({ error: { message: "opportunity run not found" } }, 404);
       }
       jobs = jobs.filter((job) => jobLinkedToRun(job, run));
     }
@@ -154,8 +194,8 @@ export function createApi(store: BrokerageStore, crm?: CrmWriteBackAdapter) {
     if (!requireWombatFirm(firmId)) {
       return c.json(firmNotFound(), 404);
     }
-    const job = await store.jobs.get(c.req.param("jobId"));
-    if (!job || job.firmId !== firmId) {
+    const job = await store.jobs.get(c.req.param("jobId"), firmId);
+    if (!job) {
       return c.json({ error: { message: "job not found" } }, 404);
     }
     return c.json({ firmId, job });

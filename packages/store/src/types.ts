@@ -12,7 +12,7 @@ export type ListOpportunityRunsQuery = {
 
 export interface JobStore {
   create(job: Job): Promise<Job>;
-  get(jobId: string): Promise<Job | null>;
+  get(jobId: string, firmId?: string): Promise<Job | null>;
   update(job: Job): Promise<Job>;
   listByStatus(status: JobStatus, limit?: number): Promise<Job[]>;
   list(query: ListJobsQuery): Promise<Job[]>;
@@ -20,7 +20,7 @@ export interface JobStore {
 
 export interface OpportunityRunStore {
   append(run: OpportunityRun): Promise<OpportunityRun>;
-  get(runId: string): Promise<OpportunityRun | null>;
+  get(runId: string, firmId?: string): Promise<OpportunityRun | null>;
   list(query: ListOpportunityRunsQuery): Promise<OpportunityRun[]>;
   voidRun(runId: string, reason: string): Promise<void>;
 }

@@ -4,7 +4,7 @@ import {
   computeDeltaBp,
   computeLvr,
   computeSavingFlag,
-  createAuditEvent,
+  appendJobAudit,
   matrixCellInputSchema,
   type CrmWriteBackAdapter,
   type Job,
@@ -137,10 +137,7 @@ export async function handleMatrixCell(
     finishedAt: ranAt,
     output,
     error: undefined,
-    audit: [
-      ...job.audit,
-      createAuditEvent("system", "writeback.applied", { sourceRunId: run.runId }),
-    ],
+    audit: appendJobAudit(job, "system", "writeback.applied", { sourceRunId: run.runId }),
   });
 }
 
@@ -210,14 +207,11 @@ async function unknownCell(
       opportunityRunId: "unknown",
       savingFlag: "unknown",
     },
-    audit: [
-      ...job.audit,
-      createAuditEvent("system", "job.succeeded", {
-        savingFlag: "unknown",
-        reason,
-        valuationJobId: input.valuationJobId,
-        pricingJobId: input.pricingJobId,
-      }),
-    ],
+    audit: appendJobAudit(job, "system", "job.succeeded", {
+      savingFlag: "unknown",
+      reason,
+      valuationJobId: input.valuationJobId,
+      pricingJobId: input.pricingJobId,
+    }),
   });
 }

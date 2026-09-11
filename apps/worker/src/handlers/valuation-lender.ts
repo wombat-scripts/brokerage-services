@@ -1,5 +1,5 @@
 import {
-  createAuditEvent,
+  appendJobAudit,
   valuationLenderInputSchema,
   type Job,
   type ValuationLenderInput,
@@ -22,13 +22,10 @@ export function handleValuationLender(
           "Live lender valuation is out of Phase 1 scope. Set input.fixture=true or PHASE1_FIXTURES=true, or complete Bitwarden attended unlock.",
         retryable: true,
       },
-      audit: [
-        ...job.audit,
-        createAuditEvent("system", "vault.unlock", {
-          lenderCode: input.lenderCode,
-          path: "attended",
-        }),
-      ],
+      audit: appendJobAudit(job, "system", "vault.unlock", {
+        lenderCode: input.lenderCode,
+        path: "attended",
+      }),
     });
   }
 
@@ -50,6 +47,6 @@ export function handleValuationLender(
     finishedAt: new Date().toISOString(),
     output,
     error: undefined,
-    audit: [...job.audit, createAuditEvent("system", "job.succeeded", { fixture: true })],
+    audit: appendJobAudit(job, "system", "job.succeeded", { fixture: true }),
   });
 }

@@ -48,6 +48,9 @@ export const auditEventSchema = z.object({
   at: z.string().min(1),
   actor: z.string().min(1),
   action: z.string().min(1),
+  /** Optional so existing Desk fixture books still parse. Write paths require it. */
+  firmId: z.string().min(1).optional(),
+  requester: z.string().min(1).optional(),
   detail: z.record(z.unknown()).optional(),
 });
 
@@ -114,15 +117,73 @@ export type Job<TInput = unknown, TOutput = unknown> = {
   subjectRefs: SubjectRefs;
 };
 
-export function createAuditEvent(
+export type CreateAuditEventArgs = {
+  actor: string;
+  action: string;
+  firmId: string;
+  requester: string;
+  detail?: Record<string, unknown>;
+};
+
+/**
+ * Create/complete audit helper. Always stamps firm_id + requester.
+ * Throws if firmId is missing — seats must not write unscoped events.
+ */
+export function createAuditEvent(args: CreateAuditEventArgs): AuditEvent {
+  assertAuditHasFirmScope(args);
+  return {
+    at: new Date().toISOString(),
+    actor: args.actor,
+    action: args.action,
+    firmId: args.firmId,
+    requester: args.requester,
+    detail: {
+      firm_id: args.firmId,
+      requester: args.requester,
+      ...args.detail,
+    },
+  };
+}
+
+export function assertAuditHasFirmScope(event: {
+  firmId?: string;
+  requester?: string;
+  detail?: Record<string, unknown>;
+}): void {
+  const firmId =
+    event.firmId ||
+    (typeof event.detail?.firm_id === "string" ? event.detail.firm_id : undefined);
+  if (!firmId) {
+    throw new Error("audit event missing firm_id");
+  }
+  const requester =
+    event.requester ||
+    (typeof event.detail?.requester === "string" ? event.detail.requester : undefined);
+  if (!requester) {
+    throw new Error("audit event missing requester");
+  }
+}
+
+export function assertJobAuditHasFirmScope(audit: AuditEvent[]): void {
+  for (const event of audit) {
+    assertAuditHasFirmScope(event);
+  }
+}
+
+export function appendJobAudit(
+  job: Pick<Job, "firmId" | "requestedBy" | "audit">,
   actor: string,
   action: string,
   detail?: Record<string, unknown>,
-): AuditEvent {
-  return {
-    at: new Date().toISOString(),
-    actor,
-    action,
-    ...(detail ? { detail } : {}),
-  };
+): AuditEvent[] {
+  return [
+    ...job.audit,
+    createAuditEvent({
+      actor,
+      action,
+      firmId: job.firmId,
+      requester: job.requestedBy,
+      detail,
+    }),
+  ];
 }
