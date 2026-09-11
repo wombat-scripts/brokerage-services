@@ -46,7 +46,7 @@ Wombat Desk (ops UI, fixtures only):
 pnpm dev:web
 ```
 
-Open http://localhost:3001. Prai × NAB should show Saving Yes. Details: `apps/web/README.md`.
+Open http://localhost:3001 for the Desk tools hub, then `/matrix` for Prai × NAB Saving Yes. Details: `apps/web/README.md`.
 
 Tests use the in-memory store and a mocked Notion adapter. They do **not** need Postgres, Bitwarden, or a Notion token.
 

@@ -6,6 +6,8 @@ Working name: **Wombat Desk**. Later host: `desk.wombathomeloans.com.au`. Previe
 
 This app is for brokers and ops. It is not the kitchen-table marketing site.
 
+Type: **Source Serif 4** for headlines and the product name, **Source Sans 3** for body, UI, and tables. Distinct from the marketing pair (Zilla Slab + IBM Plex Sans).
+
 ## How to run locally
 
 From the monorepo root (Node 22, pnpm 10):
@@ -15,7 +17,7 @@ pnpm install
 pnpm --filter @wombat/web dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001). You should see **Prai & Amanda × NAB** with **Saving Yes**.
+Open [http://localhost:3001](http://localhost:3001). You should land on the **Desk tools** hub. Open **Opportunity Matrix** for **Prai & Amanda × NAB** with **Saving Yes**.
 
 ```bash
 pnpm --filter @wombat/web typecheck
@@ -29,7 +31,8 @@ Root `pnpm test` includes `apps/web/lib/data/fixtures.test.ts`, which checks fix
 
 | Screen | Route | Job |
 | --- | --- | --- |
-| Opportunity Matrix | `/` | Client × property × loan × lender: val, LVR, current rate, new rate, Saving Yes/No, rank hint |
+| Desk tools | `/` | Hub for live modules and later rooms (Valuation, Pricing, Opportunities stay as coming soon) |
+| Opportunity Matrix | `/matrix` | Client × property × loan × lender: val, LVR, current rate, new rate, Saving Yes/No, rank hint |
 | Run history | `/runs` | Append-only Opportunity Runs for a loan (dated cells) |
 | Job status | `/jobs` | queued, running, awaiting MFA, succeeded, failed |
 | Sign in | `/login` | Optional Tom-only password gate |

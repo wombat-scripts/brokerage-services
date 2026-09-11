@@ -21,8 +21,8 @@
   --slate: #3d4a55;
   --slate-wash: #d8e0e6;
   --shadow: 0 1px 0 rgba(36, 28, 20, 0.06);
-  --font-ui: var(--font-plex-sans), "IBM Plex Sans", "Segoe UI", sans-serif;
-  --font-display: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --font-ui: var(--font-source-sans), "Source Sans 3", "Segoe UI", sans-serif;
+  --font-display: var(--font-source-serif), "Source Serif 4", Georgia, "Times New Roman", serif;
   --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
 }
 
@@ -242,13 +242,13 @@ table.matrix td {
 }
 
 table.matrix th {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-soft);
   background: #efe6d4;
-  font-weight: 550;
+  font-weight: 600;
 }
 
 table.matrix tbody tr:last-child td {
@@ -413,6 +413,67 @@ table.matrix tbody tr.unknown td {
   background: rgba(255, 255, 255, 0.28);
 }
 
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 196px;
+  height: 100%;
+  padding: 16px 18px 14px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  box-shadow: var(--shadow);
+  text-decoration: none;
+}
+
+.tool-card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 560;
+  letter-spacing: -0.02em;
+}
+
+.tool-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  max-width: 36ch;
+}
+
+.tool-cue {
+  margin-top: auto;
+  font-size: 13px;
+  color: var(--rust);
+}
+
+a.tool-card:hover {
+  border-color: var(--rule-strong);
+  color: inherit;
+}
+
+a.tool-card:hover .tool-cue {
+  color: var(--rust-deep);
+}
+
+.tool-card.soon {
+  color: var(--ink-soft);
+  background: rgba(247, 241, 230, 0.55);
+}
+
+.tool-card.soon .tool-cue {
+  color: var(--ink-soft);
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(5, minmax(170px, 1fr));
@@ -523,5 +584,9 @@ table.matrix tbody tr.unknown td {
 
   .callout dl {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .tool-grid {
+    grid-template-columns: 1fr;
   }
 }
