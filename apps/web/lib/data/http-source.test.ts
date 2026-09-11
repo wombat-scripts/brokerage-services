@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { WOMBAT_FIRM_ID } from "@wombat/contracts";
 import {
+  WOMBAT_FIRM_ID,
   deskJobListResponseSchema,
   deskJobResponseSchema,
   deskOpportunityRunListResponseSchema,
   deskOpportunityRunResponseSchema,
-} from "./desk-api";
+} from "@wombat/contracts";
 import { fixtureDeskSource } from "./fixture-source";
 import { PRAI_SUBJECT } from "./fixtures";
 import {
@@ -16,7 +16,7 @@ import {
 } from "./http-source";
 import { createDeskSource } from "./source";
 
-/** Documented list-runs envelope from docs/desk-api.md on platform PR #3. */
+/** Documented list-runs envelope from docs/desk-api.md. */
 const DOCUMENTED_RUN = {
   runId: "01JPHASE11PRAI0001",
   firmId: "wombat",

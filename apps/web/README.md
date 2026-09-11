@@ -52,14 +52,14 @@ With the Phase 1.1 fixture server you should see run `01JPHASE11PRAI0001` (jobs 
 
 `firmId` is `wombat` (`DESK_FIRM_ID` override). No Notion token is required for API fixture mode.
 
-Endpoints (see platform PR #3 `docs/desk-api.md`):
+Endpoints (see `docs/desk-api.md`):
 
 - `GET /v1/firms/:firmId/opportunity-runs?client=&status=`
 - `GET /v1/firms/:firmId/opportunity-runs/:runId`
 - `GET /v1/firms/:firmId/jobs?runId=`
 - `GET /v1/firms/:firmId/jobs/:jobId`
 
-Response wrappers `{ firmId, opportunityRuns[] }`, `{ firmId, opportunityRun }`, `{ firmId, jobs[] }`, `{ firmId, job }` are parsed with local Zod in `lib/data/desk-api.ts`. Those schemas already exist on PR #3 as `@wombat/contracts` `deskOpportunityRunListResponseSchema` et al.; they are duplicated here until that PR is on main. Do not treat this as a contracts rewrite.
+Response wrappers `{ firmId, opportunityRuns[] }`, `{ firmId, opportunityRun }`, `{ firmId, jobs[] }`, `{ firmId, job }` are parsed with `@wombat/contracts` `deskOpportunityRunListResponseSchema` et al.
 
 Display labels (client name, address) are not on the run contract. Desk joins `client_prai` / `property_15_ashley` / `loan_nab_800k` to the Phase A strings, and shows the page id when a run is unknown.
 

@@ -1,16 +1,14 @@
 import {
   WOMBAT_FIRM_ID,
+  deskJobListResponseSchema,
+  deskJobResponseSchema,
+  deskOpportunityRunListResponseSchema,
+  deskOpportunityRunResponseSchema,
   rankHintSchema,
   type Job,
   type OpportunityRun,
   type RankHint,
 } from "@wombat/contracts";
-import {
-  deskJobListResponseSchema,
-  deskJobResponseSchema,
-  deskOpportunityRunListResponseSchema,
-  deskOpportunityRunResponseSchema,
-} from "./desk-api";
 import { DESK_SUBJECTS, PRAI_SUBJECT } from "./fixtures";
 import type { DeskBook, DeskDataSource, DeskMatrixCell, DeskSubject } from "./types";
 
