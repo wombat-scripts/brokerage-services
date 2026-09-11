@@ -25,10 +25,10 @@ export default async function MatrixPage() {
 
       {happy ? (
         <section className="callout" aria-label="Prai NAB happy path">
-          <SavingStamp flag={happy.savingFlag} />
           <div>
             <h2>
-              {happy.subject.clientName} × {happy.targetLenderCode}
+              <SavingStamp flag={happy.savingFlag} /> {happy.subject.clientName} ×{" "}
+              {happy.targetLenderCode}
             </h2>
             <p>
               {happy.subject.propertyLabel}. Current lender {happy.currentLenderCode}.{" "}

@@ -5,6 +5,7 @@ import type { NextConfig } from "next";
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  agentRules: false,
   transpilePackages: ["@wombat/contracts"],
   outputFileTracingRoot: path.join(appDir, "../.."),
   // Contracts use Node ESM specifiers (`./firm.js` → firm.ts). Do not rewrite
