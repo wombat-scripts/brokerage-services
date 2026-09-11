@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
+import { IBM_Plex_Mono, Source_Sans_3, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
-const newsreader = Newsreader({
+const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
-  variable: "--font-newsreader",
+  variable: "--font-source-serif",
   display: "swap",
 });
 
-const plexSans = IBM_Plex_Sans({
+const sourceSans = Source_Sans_3({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-sans",
+  variable: "--font-source-sans",
   display: "swap",
 });
 
@@ -34,7 +33,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-AU">
-      <body className={`${newsreader.variable} ${plexSans.variable} ${plexMono.variable}`}>
+      <body className={`${sourceSerif.variable} ${sourceSans.variable} ${plexMono.variable}`}>
         {children}
       </body>
     </html>
