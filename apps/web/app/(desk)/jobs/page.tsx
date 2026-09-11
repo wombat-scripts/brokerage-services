@@ -14,8 +14,8 @@ export default async function JobsPage() {
         <div>
           <h1>Job status</h1>
           <p>
-            Fixture mix across queued, running, awaiting MFA, succeeded, and failed. Later this
-            page reads <code>GET /jobs</code> from the API. Today it does not.
+            Queued, running, awaiting MFA, succeeded, and failed. Default is the fixture mix. Set{" "}
+            <code>DESK_API_BASE_URL</code> to read <code>GET /v1/firms/:firmId/jobs</code>.
           </p>
         </div>
       </div>

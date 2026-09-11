@@ -21,7 +21,7 @@ export function JobBoard({ jobs }: { jobs: Job[] }) {
               <JobStatusStamp status={status} />
               <span className="meta">{items.length}</span>
             </h2>
-            {items.length === 0 ? <p className="muted">None in the fixture mix.</p> : null}
+            {items.length === 0 ? <p className="muted">None.</p> : null}
             {items.map((job) => (
               <article className="job-card" key={job.jobId}>
                 <h2>{formatJobKind(job.kind)}</h2>

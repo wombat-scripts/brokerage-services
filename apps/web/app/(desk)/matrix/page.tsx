@@ -17,8 +17,8 @@ export default async function MatrixPage() {
         <div>
           <h1>Opportunity Matrix</h1>
           <p>
-            One cell per client, property, loan, and target lender. Numbers come from the Phase 1
-            fixture book, not a live portal.
+            One cell per client, property, loan, and target lender. Numbers come from the Desk
+            data source (fixtures by default, or Andre&apos;s read API), not a live portal.
           </p>
         </div>
       </div>
@@ -60,8 +60,8 @@ export default async function MatrixPage() {
         </section>
       ) : (
         <div className="empty">
-          Happy-path cell is missing from the fixture book. Check{" "}
-          <code>apps/web/lib/data/fixtures.ts</code>.
+          Happy-path cell is missing. Check the fixture book or{" "}
+          <code>DESK_API_BASE_URL</code> for run <code>01JPHASE11PRAI0001</code>.
         </div>
       )}
 

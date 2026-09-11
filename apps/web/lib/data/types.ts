@@ -27,7 +27,7 @@ export type DeskMatrixCell = {
 };
 
 export type DeskBook = {
-  source: "fixture";
+  source: "fixture" | "http";
   generatedAt: string;
   cells: DeskMatrixCell[];
   runs: OpportunityRun[];
@@ -36,9 +36,9 @@ export type DeskBook = {
 };
 
 /**
- * Swap point for Andre's API.
- * Today: FixtureDeskSource.
- * Later: HTTP reads against GET /jobs and opportunity-run list endpoints once they exist.
+ * Swap point for Andre's Desk read API.
+ * Default: FixtureDeskSource.
+ * When DESK_API_BASE_URL is set: HttpDeskSource.
  */
 export interface DeskDataSource {
   getBook(): Promise<DeskBook>;
