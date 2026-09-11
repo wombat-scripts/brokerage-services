@@ -7,11 +7,13 @@
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter @wombat/web typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:api": "pnpm --filter @wombat/api dev",
     "dev:worker": "pnpm --filter @wombat/worker dev",
+    "dev:web": "pnpm --filter @wombat/web dev",
+    "build:web": "pnpm --filter @wombat/web build",
     "migrate": "pnpm --filter @wombat/store migrate"
   },
   "devDependencies": {

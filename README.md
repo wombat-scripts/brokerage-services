@@ -14,6 +14,7 @@ This repo is separate from Amy’s `wombat-website`. No live NAB or CoreLogic po
 | `packages/store` | Job store + append-only `opportunity_runs` (memory for tests; Postgres for runtime) |
 | `apps/api` | Thin Hono API: `POST /jobs`, `GET /jobs/:jobId` |
 | `apps/worker` | Processes jobs. `opportunity.matrix_cell` composes val + price and writes via adapters |
+| `apps/web` | **Wombat Desk** Phase A ops console. Fixture book UI for Tom. See `apps/web/README.md` |
 | `db/migrations` | SQL for `jobs` and `opportunity_runs` |
 
 ## Locked decisions
@@ -38,6 +39,14 @@ pnpm install
 pnpm typecheck
 pnpm test
 ```
+
+Wombat Desk (ops UI, fixtures only):
+
+```bash
+pnpm dev:web
+```
+
+Open http://localhost:3001. Prai × NAB should show Saving Yes. Details: `apps/web/README.md`.
 
 Tests use the in-memory store and a mocked Notion adapter. They do **not** need Postgres, Bitwarden, or a Notion token.
 
