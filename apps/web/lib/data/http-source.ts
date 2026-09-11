@@ -28,9 +28,21 @@ export class DeskApiError extends Error {
 export type HttpDeskSourceOptions = {
   baseUrl: string;
   firmId?: string;
+  /** When set, every request sends `Authorization: Bearer <key>` (Phase 1.2 stub). */
+  apiKey?: string;
   fetch?: typeof fetch;
   subjects?: DeskSubject[];
 };
+
+/** Headers for Desk HTTP reads. Auth only when `apiKey` is non-empty after trim. */
+export function deskApiRequestHeaders(apiKey?: string): Record<string, string> {
+  const headers: Record<string, string> = { accept: "application/json" };
+  const key = apiKey?.trim();
+  if (key) {
+    headers.authorization = `Bearer ${key}`;
+  }
+  return headers;
+}
 
 export function subjectForPages(
   pages: Pick<DeskSubject, "clientPageId" | "propertyPageId" | "loanPageId">,
@@ -128,6 +140,7 @@ function subjectsFromRuns(runs: OpportunityRun[], knownSubjects: DeskSubject[]):
 export class HttpDeskSource implements DeskDataSource {
   readonly baseUrl: string;
   readonly firmId: string;
+  private readonly apiKey?: string;
   private readonly fetchImpl: typeof fetch;
   private readonly knownSubjects: DeskSubject[];
   private bookPromise?: Promise<DeskBook>;
@@ -135,6 +148,7 @@ export class HttpDeskSource implements DeskDataSource {
   constructor(options: HttpDeskSourceOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.firmId = options.firmId?.trim() || WOMBAT_FIRM_ID;
+    this.apiKey = options.apiKey?.trim() || undefined;
     this.fetchImpl = options.fetch ?? fetch;
     this.knownSubjects = options.subjects ?? DESK_SUBJECTS;
   }
@@ -147,7 +161,7 @@ export class HttpDeskSource implements DeskDataSource {
     url: string,
     parse: (json: unknown) => { success: true; data: T } | { success: false; error: { message: string } },
   ): Promise<T> {
-    const response = await this.fetchImpl(url, { headers: { accept: "application/json" } });
+    const response = await this.fetchImpl(url, { headers: deskApiRequestHeaders(this.apiKey) });
     if (!response.ok) {
       throw new DeskApiError(`Desk API ${response.status} for ${url}`, response.status);
     }
