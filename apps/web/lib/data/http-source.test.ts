@@ -12,9 +12,10 @@ import {
   DESK_API_HAPPY_PATH_RUN_ID,
   DeskApiError,
   HttpDeskSource,
+  deskApiRequestHeaders,
   subjectForPages,
 } from "./http-source";
-import { createDeskSource } from "./source";
+import { createDeskSource, readDeskApiKey } from "./source";
 
 /** Documented list-runs envelope from docs/desk-api.md. */
 const DOCUMENTED_RUN = {
@@ -166,12 +167,21 @@ describe("HttpDeskSource", () => {
     vi.unstubAllGlobals();
   });
 
-  function sourceWith(fetchImpl: (input: RequestInfo | URL) => Promise<Response>) {
+  function sourceWith(
+    fetchImpl: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+    apiKey?: string,
+  ) {
     return new HttpDeskSource({
       baseUrl: "http://127.0.0.1:3000",
       firmId: WOMBAT_FIRM_ID,
+      apiKey,
       fetch: fetchImpl as typeof fetch,
     });
+  }
+
+  function requestHeaders(fetchImpl: { mock: { calls: unknown[][] } }, call = 0): Record<string, string> {
+    const init = fetchImpl.mock.calls[call]?.[1] as RequestInit | undefined;
+    return (init?.headers ?? {}) as Record<string, string>;
   }
 
   it("maps the Prai API run to Saving Yes / 45bp with local labels", async () => {
@@ -278,11 +288,44 @@ describe("HttpDeskSource", () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ error: { message: "missing" } }, 404));
     await expect(sourceWith(fetchImpl).getOpportunityRun("missing")).rejects.toBeInstanceOf(DeskApiError);
   });
+
+  it("sends Authorization Bearer when apiKey is set", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ firmId: "wombat", opportunityRun: DOCUMENTED_RUN }));
+    await sourceWith(fetchImpl, "desk-secret").getOpportunityRun(DESK_API_HAPPY_PATH_RUN_ID);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(requestHeaders(fetchImpl)).toEqual({
+      accept: "application/json",
+      authorization: "Bearer desk-secret",
+    });
+  });
+
+  it("sends no auth headers when apiKey is unset", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ firmId: "wombat", opportunityRun: DOCUMENTED_RUN }));
+    await sourceWith(fetchImpl).getOpportunityRun(DESK_API_HAPPY_PATH_RUN_ID);
+    const headers = requestHeaders(fetchImpl);
+    expect(headers).toEqual({ accept: "application/json" });
+    expect(headers).not.toHaveProperty("authorization");
+    expect(headers).not.toHaveProperty("Authorization");
+    expect(headers).not.toHaveProperty("x-api-key");
+    expect(headers).not.toHaveProperty("X-Api-Key");
+  });
+});
+
+describe("deskApiRequestHeaders / readDeskApiKey", () => {
+  it("omits auth when the key is blank or whitespace", () => {
+    expect(deskApiRequestHeaders(undefined)).toEqual({ accept: "application/json" });
+    expect(deskApiRequestHeaders("")).toEqual({ accept: "application/json" });
+    expect(deskApiRequestHeaders("   ")).toEqual({ accept: "application/json" });
+    expect(readDeskApiKey({})).toBeUndefined();
+    expect(readDeskApiKey({ DESK_API_KEY: "  " })).toBeUndefined();
+    expect(readDeskApiKey({ DESK_API_KEY: "desk-secret" })).toBe("desk-secret");
+  });
 });
 
 describe("createDeskSource", () => {
   it("defaults to fixtures when DESK_API_BASE_URL is unset", () => {
     expect(createDeskSource({})).toBe(fixtureDeskSource);
+    expect(createDeskSource({ DESK_API_KEY: "desk-secret" })).toBe(fixtureDeskSource);
   });
 
   it("selects HttpDeskSource when DESK_API_BASE_URL is set", () => {

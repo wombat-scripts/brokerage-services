@@ -46,6 +46,10 @@ pnpm --filter @wombat/web dev
 # HTTP mode — Andre’s API on :3000, Desk on :3001
 # Next loads env from apps/web, so prefix the command or use apps/web/.env.local
 DESK_API_BASE_URL=http://127.0.0.1:3000 pnpm --filter @wombat/web dev
+
+# When the API has DESK_API_KEY set, Desk must send the same key (Phase 1.2).
+# Unset = no auth headers (current curls / open local API still work).
+DESK_API_BASE_URL=http://127.0.0.1:3000 DESK_API_KEY=dev-desk-key pnpm --filter @wombat/web dev
 ```
 
 With the Phase 1.1 fixture server you should see run `01JPHASE11PRAI0001` (jobs `job_val_fixture_prai_nab` / `job_price_fixture_prai_nab` / `job_matrix_fixture_prai_nab`) at **$800,000 / $1,025,000 → Saving Yes / 45bp**. Those numbers are still a fixture cell, not a live NAB quote.
@@ -97,6 +101,7 @@ Other fixture-only rows (CBA Saving No, WBC unknown / awaiting MFA, Chen househo
 | --- | --- |
 | `DESK_GATE_PASSWORD` | If set, `/login` is required. If unset, the desk is open and the chrome says “Signed in as Tom”. |
 | `DESK_API_BASE_URL` | If set, Desk uses `HttpDeskSource` against that origin. If unset, fixtures. |
+| `DESK_API_KEY` | Optional. Same secret as the API (`docs/desk-api.md`). If set, every Desk API request sends `Authorization: Bearer <key>`. If unset, no auth headers — open local/fixture path still works. |
 | `DESK_FIRM_ID` | Firm path segment. Default `wombat`. |
 | `DESK_DATA_SOURCE` | Optional. `api` without `DESK_API_BASE_URL` is an error. |
 
