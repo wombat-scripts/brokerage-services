@@ -1,10 +1,29 @@
 # Desk read API (Amy)
 
-Phase 1.1 read contracts for Wombat Desk. Shapes come from `@wombat/contracts` (`OpportunityRun`, `Job`). No Notion token is required: when `DATABASE_URL` is unset the API seeds an in-memory Prai × NAB fixture.
+Phase 1.1 / 1.2 read contracts for Wombat Desk. Shapes come from `@wombat/contracts` (`OpportunityRun`, `Job`). No Notion token is required: when `DATABASE_URL` is unset the API seeds an in-memory Prai × NAB fixture.
 
 Base URL locally: `http://127.0.0.1:3000`
 
-`firmId` is always `wombat`. Other firm ids return `404`.
+`firmId` is always `wombat`. Other firm ids return **`404`** (not an empty list). List/get are firm-scoped in the store (`firm_id` on every query). CI runs the same list/get against Postgres.
+
+## Seat / service auth (stub)
+
+No multi-tenant product UI. Seats and Desk call the API as a service.
+
+| Mode | When | Header |
+| --- | --- | --- |
+| Open (default) | `DESK_API_KEY` / `API_AUTH_TOKEN` unset | none — local fixture path, Amy’s current curls keep working |
+| Stub key | env set | `Authorization: Bearer <key>` **or** `X-Api-Key: <key>` |
+
+Optional: `X-Requested-By: seat:andre` (create still uses JSON `requestedBy`). `/health` stays open.
+
+When a key is configured and the header is missing or wrong → **`401`**.
+
+```bash
+curl -s 'http://127.0.0.1:3000/v1/firms/wombat/opportunity-runs'
+curl -s -H "Authorization: Bearer $DESK_API_KEY" 'http://127.0.0.1:3000/v1/firms/wombat/opportunity-runs'
+curl -s -H "X-Api-Key: $DESK_API_KEY" 'http://127.0.0.1:3000/v1/firms/wombat/jobs'
+```
 
 ## Stable fixture ids
 
@@ -109,7 +128,16 @@ List jobs. Optional `runId` returns the valuation, pricing, and matrix jobs link
       "input": {},
       "output": { "lenderCode": "NAB", "valueAud": 1025000 },
       "artefacts": [],
-      "audit": [],
+      "audit": [
+        {
+          "at": "2026-09-11T05:50:00.000Z",
+          "actor": "platform-andre",
+          "action": "job.created",
+          "firmId": "wombat",
+          "requester": "platform-andre",
+          "detail": { "firm_id": "wombat", "requester": "platform-andre", "kind": "valuation.lender" }
+        }
+      ],
       "subjectRefs": { "propertyPageId": "property_15_ashley" }
     }
   ]
@@ -120,6 +148,8 @@ List jobs. Optional `runId` returns the valuation, pricing, and matrix jobs link
 curl -s 'http://127.0.0.1:3000/v1/firms/wombat/jobs'
 curl -s 'http://127.0.0.1:3000/v1/firms/wombat/jobs?runId=01JPHASE11PRAI0001'
 ```
+
+Unknown `runId` (missing or another firm) → **`404`**, not `{ "jobs": [] }`.
 
 ### `GET /v1/firms/:firmId/jobs/:jobId`
 
@@ -139,7 +169,24 @@ curl -s 'http://127.0.0.1:3000/v1/firms/wombat/jobs/job_val_fixture_prai_nab'
 | Status | When |
 | --- | --- |
 | `400` | Invalid query (`status` not in the enum) |
-| `404` | Unknown `firmId`, run, or job |
+| `401` | API key configured and Bearer / `X-Api-Key` missing or wrong |
+| `404` | Unknown `firmId`, run, job, or `jobs?runId=` that is missing / other-firm |
+
+## Seat write path
+
+Canonical create is firm-scoped. `POST /jobs` remains a **wombat-default alias** (same body, still stamps `firmId=wombat`).
+
+### `POST /v1/firms/:firmId/jobs`
+
+Wrong `firmId` → `404`. Body is unchanged: `kind`, `requestedBy`, `input`, optional `subjectRefs`. Create audit always includes `firmId` / `detail.firm_id` and `requester`.
+
+```bash
+curl -s -X POST 'http://127.0.0.1:3000/v1/firms/wombat/jobs' \
+  -H 'content-type: application/json' \
+  -d '{"kind":"valuation.lender","requestedBy":"seat:andre","input":{"fixture":true,"lenderCode":"NAB"}}'
+```
+
+`GET /jobs/:jobId` remains a wombat-default alias. Prefer `GET /v1/firms/wombat/jobs/:jobId`.
 
 ## Contracts
 
@@ -152,7 +199,7 @@ Import from `@wombat/contracts`:
 - `deskJobListResponseSchema`
 - `deskJobResponseSchema`
 
-Seat write path is unchanged: `POST /jobs` + `GET /jobs/:jobId` (no `/v1/firms` prefix).
+Seat write path: `POST /v1/firms/:firmId/jobs` (canonical) or `POST /jobs` (wombat alias). Poll `GET /v1/firms/:firmId/jobs/:jobId` or `GET /jobs/:jobId`.
 
 ## Notion write-back (not required to read)
 

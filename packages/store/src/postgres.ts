@@ -3,8 +3,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import {
-  WOMBAT_FIRM_ID,
+  assertJobAuditHasFirmScope,
   assertWombatFirmId,
+  computeDeltaAudPa,
   resolveOpportunityRunStatus,
   type Job,
   type JobStatus,
@@ -29,10 +30,18 @@ function migrationsDir(): string {
   return path.resolve(here, "../../../db/migrations");
 }
 
+function asJson<T>(value: unknown, fallback: T): T {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === "string") {
+    return JSON.parse(value) as T;
+  }
+  return value as T;
+}
+
 function rowToJob(row: Record<string, unknown>): Job {
   return {
     jobId: String(row.job_id),
-    firmId: WOMBAT_FIRM_ID,
+    firmId: String(row.firm_id) as Job["firmId"],
     kind: row.kind as Job["kind"],
     version: String(row.version),
     status: row.status as Job["status"],
@@ -41,19 +50,27 @@ function rowToJob(row: Record<string, unknown>): Job {
     updatedAt: toIso(row.updated_at),
     ...(row.started_at ? { startedAt: toIso(row.started_at) } : {}),
     ...(row.finished_at ? { finishedAt: toIso(row.finished_at) } : {}),
-    input: row.input,
-    ...(row.output !== null && row.output !== undefined ? { output: row.output } : {}),
-    ...(row.error !== null && row.error !== undefined ? { error: row.error as Job["error"] } : {}),
-    artefacts: (row.artefacts as Job["artefacts"]) ?? [],
-    audit: (row.audit as Job["audit"]) ?? [],
-    subjectRefs: (row.subject_refs as Job["subjectRefs"]) ?? {},
+    input: asJson(row.input, {}),
+    ...(row.output !== null && row.output !== undefined ? { output: asJson(row.output, undefined) } : {}),
+    ...(row.error !== null && row.error !== undefined ? { error: asJson(row.error, undefined) as Job["error"] } : {}),
+    artefacts: asJson(row.artefacts, []),
+    audit: asJson(row.audit, []),
+    subjectRefs: asJson(row.subject_refs, {}),
   };
 }
 
 function rowToRun(row: Record<string, unknown>): OpportunityRun {
+  const loanBalanceAud = Number(row.loan_balance_aud);
+  const currentRate =
+    row.current_rate !== null && row.current_rate !== undefined ? Number(row.current_rate) : undefined;
+  const newRate = row.new_rate !== null && row.new_rate !== undefined ? Number(row.new_rate) : undefined;
+  const deltaAudPa =
+    currentRate !== undefined && newRate !== undefined
+      ? computeDeltaAudPa(loanBalanceAud, currentRate, newRate)
+      : undefined;
   return {
     runId: String(row.run_id),
-    firmId: WOMBAT_FIRM_ID,
+    firmId: String(row.firm_id) as OpportunityRun["firmId"],
     ranAt: toIso(row.ran_at),
     requestedBy: String(row.requested_by),
     clientPageId: String(row.client_page_id),
@@ -61,20 +78,19 @@ function rowToRun(row: Record<string, unknown>): OpportunityRun {
     loanPageId: String(row.loan_page_id),
     currentLenderCode: String(row.current_lender_code),
     targetLenderCode: String(row.target_lender_code),
-    loanBalanceAud: Number(row.loan_balance_aud),
+    loanBalanceAud,
     valAud: Number(row.val_aud),
     valDate: toDateOnly(row.val_date),
     valSource: row.val_source as OpportunityRun["valSource"],
     lvr: Number(row.lvr),
-    ...(row.current_rate !== null && row.current_rate !== undefined
-      ? { currentRate: Number(row.current_rate) }
-      : {}),
+    ...(currentRate !== undefined ? { currentRate } : {}),
     ...(row.current_rate_source
       ? { currentRateSource: row.current_rate_source as OpportunityRun["currentRateSource"] }
       : {}),
-    ...(row.new_rate !== null && row.new_rate !== undefined ? { newRate: Number(row.new_rate) } : {}),
+    ...(newRate !== undefined ? { newRate } : {}),
     savingFlag: row.saving_flag as OpportunityRun["savingFlag"],
     ...(row.delta_bp !== null && row.delta_bp !== undefined ? { deltaBp: Number(row.delta_bp) } : {}),
+    ...(deltaAudPa !== undefined ? { deltaAudPa } : {}),
     status: row.voided_at ? "voided" : "succeeded",
     valuationJobId: String(row.valuation_job_id),
     pricingJobId: String(row.pricing_job_id),
@@ -101,6 +117,7 @@ class PostgresJobStore implements JobStore {
 
   async create(job: Job): Promise<Job> {
     assertWombatFirmId(job.firmId);
+    assertJobAuditHasFirmScope(job.audit);
     await this.db.query(
       `INSERT INTO jobs (
         job_id, firm_id, kind, version, status, requested_by,
@@ -118,14 +135,17 @@ class PostgresJobStore implements JobStore {
     return stored;
   }
 
-  async get(jobId: string): Promise<Job | null> {
-    const result = await this.db.query(`SELECT * FROM jobs WHERE job_id = $1`, [jobId]);
+  async get(jobId: string, firmId?: string): Promise<Job | null> {
+    const result = firmId
+      ? await this.db.query(`SELECT * FROM jobs WHERE job_id = $1 AND firm_id = $2`, [jobId, firmId])
+      : await this.db.query(`SELECT * FROM jobs WHERE job_id = $1`, [jobId]);
     const row = result.rows[0];
     return row ? rowToJob(row) : null;
   }
 
   async update(job: Job): Promise<Job> {
     assertWombatFirmId(job.firmId);
+    assertJobAuditHasFirmScope(job.audit);
     const result = await this.db.query(
       `UPDATE jobs SET
         firm_id = $2, kind = $3, version = $4, status = $5, requested_by = $6,
@@ -183,7 +203,7 @@ class PostgresOpportunityRunStore implements OpportunityRunStore {
       )`,
       [
         run.runId,
-        WOMBAT_FIRM_ID,
+        run.firmId,
         run.ranAt,
         run.requestedBy,
         run.clientPageId,
@@ -213,8 +233,13 @@ class PostgresOpportunityRunStore implements OpportunityRunStore {
     return stored;
   }
 
-  async get(runId: string): Promise<OpportunityRun | null> {
-    const result = await this.db.query(`SELECT * FROM opportunity_runs WHERE run_id = $1`, [runId]);
+  async get(runId: string, firmId?: string): Promise<OpportunityRun | null> {
+    const result = firmId
+      ? await this.db.query(`SELECT * FROM opportunity_runs WHERE run_id = $1 AND firm_id = $2`, [
+          runId,
+          firmId,
+        ])
+      : await this.db.query(`SELECT * FROM opportunity_runs WHERE run_id = $1`, [runId]);
     const row = result.rows[0];
     return row ? rowToRun(row) : null;
   }
@@ -247,7 +272,7 @@ class PostgresOpportunityRunStore implements OpportunityRunStore {
 function jobParams(job: Job): unknown[] {
   return [
     job.jobId,
-    WOMBAT_FIRM_ID,
+    job.firmId,
     job.kind,
     job.version,
     job.status,
@@ -274,6 +299,10 @@ export function createPostgresStore(db: PgQueryable): BrokerageStore {
 
 export function createPgPool(databaseUrl: string): pg.Pool {
   return new Pool({ connectionString: databaseUrl });
+}
+
+export async function resetPostgresData(db: PgQueryable): Promise<void> {
+  await db.query(`TRUNCATE TABLE jobs, opportunity_runs RESTART IDENTITY CASCADE`);
 }
 
 export async function applyMigrations(db: PgQueryable, dir = migrationsDir()): Promise<string[]> {

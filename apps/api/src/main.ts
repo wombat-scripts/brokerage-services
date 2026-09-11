@@ -2,13 +2,14 @@ import { serve } from "@hono/node-server";
 import { seedPraiNabDeskFixtures } from "@wombat/store";
 import { createWorkerAdapters, createWorkerStore } from "@wombat/worker";
 import { createApi } from "./app.js";
+import { resolveDeskAuthConfig } from "./auth.js";
 
 const { store } = createWorkerStore();
 if (!process.env.DATABASE_URL) {
   await seedPraiNabDeskFixtures(store);
 }
 const { crm } = createWorkerAdapters();
-const app = createApi(store, crm);
+const app = createApi(store, crm, resolveDeskAuthConfig());
 const port = Number(process.env.API_PORT ?? 3000);
 const hostname = process.env.API_HOST ?? "127.0.0.1";
 

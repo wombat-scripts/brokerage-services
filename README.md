@@ -12,7 +12,7 @@ This repo is separate from Amy’s `wombat-website`. No live NAB or CoreLogic po
 | `packages/notion-adapter` | `CrmWriteBackAdapter` for Notion. Fail closed. Cites `sourceRunId`. Never writes Loans **Interest Rate** |
 | `packages/bitwarden-vault` | Vendor-agnostic `CredentialVault` behind a Bitwarden Secrets Manager / machine-account stub |
 | `packages/store` | Job store + append-only `opportunity_runs` (memory for tests; Postgres for runtime) |
-| `apps/api` | Thin Hono API: `POST /jobs`, `GET /jobs/:jobId`, plus Desk reads under `/v1/firms/:firmId` |
+| `apps/api` | Thin Hono API: firm-scoped Desk + jobs under `/v1/firms/:firmId`, plus wombat aliases `POST /jobs` and `GET /jobs/:jobId` |
 | `apps/worker` | Processes jobs. `opportunity.matrix_cell` composes val + price and writes via adapters |
 | `apps/web` | **Wombat Desk** Phase A ops console. Fixture book UI for Tom. See `apps/web/README.md` |
 | `db/migrations` | SQL for `jobs` and `opportunity_runs` |
@@ -48,14 +48,16 @@ pnpm dev:web
 
 Open http://localhost:3001 for the Desk tools hub, then `/matrix` for Prai × NAB Saving Yes. Set `DESK_API_BASE_URL=http://127.0.0.1:3000` to read Andre’s Phase 1.1 Desk API instead. Details: `apps/web/README.md`.
 
-Tests use the in-memory store and a mocked Notion adapter. They do **not** need Postgres, Bitwarden, or a Notion token.
+Local `pnpm test` uses the in-memory store and a mocked Notion adapter. It does **not** need Postgres, Bitwarden, or a Notion token. CI starts a Postgres service, runs `pnpm migrate`, and fails if Desk list/get against Postgres regresses.
 
 ## How seats call a job
 
-Seats import types from `@wombat/contracts` only, then `POST /jobs`. The API stamps `firmId: "wombat"`.
+Seats import types from `@wombat/contracts` only, then `POST /v1/firms/wombat/jobs` (or the wombat alias `POST /jobs`). The API stamps `firmId: "wombat"`. Wrong firm → `404`. Create/complete audit always includes `firm_id` + requester.
+
+When `DESK_API_KEY` is set, send `Authorization: Bearer …` or `X-Api-Key`. Unset = open local/fixture path (Amy’s curls stay valid).
 
 ```http
-POST /jobs
+POST /v1/firms/wombat/jobs
 Content-Type: application/json
 ```
 
@@ -83,8 +85,10 @@ Content-Type: application/json
 Poll status:
 
 ```http
-GET /jobs/{jobId}
+GET /v1/firms/wombat/jobs/{jobId}
 ```
+
+`GET /jobs/{jobId}` is a wombat-default alias.
 
 Statuses: `queued` → `running` → `succeeded` | `failed` | `cancelled` | `awaiting_attended_mfa`.
 
@@ -149,7 +153,7 @@ Prefer **Australian** regions for:
 
 Orchestrating seats can live elsewhere. Pin the job bus and artefacts to AU. This repo does not provision cloud resources.
 
-Local Docker Postgres is **not** AU-resident; it is only for development. Tests do not open a database.
+Local Docker Postgres is **not** AU-resident; it is only for development. Local tests stay in-memory unless `DATABASE_URL` is set. CI always opens the service-container Postgres.
 
 ## Bitwarden Secrets Manager / machine accounts
 
@@ -186,7 +190,7 @@ Documented in [docs/desk-api.md](docs/desk-api.md). When Postgres is not configu
 | `GET` | `/v1/firms/:firmId/jobs` | Optional `runId` |
 | `GET` | `/v1/firms/:firmId/jobs/:jobId` | Full `Job` envelope |
 
-`firmId` must be `wombat`.
+`firmId` must be `wombat`. Other firms → `404` (not an empty list). Auth stub documented in `docs/desk-api.md`.
 
 ## Out of scope (Phase 1)
 

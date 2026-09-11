@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   WOMBAT_FIRM_ID,
-  type DeskJobListResponse,
-  type DeskJobResponse,
   type DeskOpportunityRunListResponse,
-  type DeskOpportunityRunResponse,
 } from "@wombat/contracts";
 import {
   PRAI_NAB_DESK_FIXTURE_IDS,
@@ -12,42 +9,22 @@ import {
   seedPraiNabDeskFixtures,
 } from "@wombat/store";
 import { createApi } from "./app.js";
+import { expectCrossFirmIsolation, expectPraiNabDeskReads } from "./desk-api.cases.js";
 
-async function seededApp() {
+async function seededApp(auth?: { apiKey?: string }) {
   const store = createMemoryStore();
   await seedPraiNabDeskFixtures(store);
-  return createApi(store);
+  return { app: createApi(store, undefined, auth), store };
 }
 
 describe("Desk read APIs", () => {
-  it("lists the seeded Prai × NAB opportunity run", async () => {
-    const app = await seededApp();
-    const res = await app.request("/v1/firms/wombat/opportunity-runs");
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as DeskOpportunityRunListResponse;
-    expect(body.firmId).toBe(WOMBAT_FIRM_ID);
-    expect(body.opportunityRuns).toHaveLength(1);
-    expect(body.opportunityRuns[0]).toMatchObject({
-      runId: PRAI_NAB_DESK_FIXTURE_IDS.runId,
-      firmId: WOMBAT_FIRM_ID,
-      clientPageId: "client_prai",
-      loanBalanceAud: 800000,
-      valAud: 1025000,
-      lvr: 800000 / 1025000,
-      currentRate: 0.065,
-      newRate: 0.0605,
-      savingFlag: "yes",
-      deltaBp: 45,
-      deltaAudPa: 3600,
-      status: "succeeded",
-      valuationJobId: PRAI_NAB_DESK_FIXTURE_IDS.valuationJobId,
-      pricingJobId: PRAI_NAB_DESK_FIXTURE_IDS.pricingJobId,
-      matrixJobId: PRAI_NAB_DESK_FIXTURE_IDS.matrixJobId,
-    });
+  it("lists and gets the seeded Prai × NAB run and jobs (memory)", async () => {
+    const { app } = await seededApp();
+    await expectPraiNabDeskReads(app);
   });
 
   it("filters runs by client and status", async () => {
-    const app = await seededApp();
+    const { app } = await seededApp();
     const hit = await app.request("/v1/firms/wombat/opportunity-runs?client=client_prai&status=succeeded");
     expect(hit.status).toBe(200);
     expect(((await hit.json()) as DeskOpportunityRunListResponse).opportunityRuns).toHaveLength(1);
@@ -60,54 +37,85 @@ describe("Desk read APIs", () => {
   });
 
   it("rejects an invalid status filter", async () => {
-    const app = await seededApp();
+    const { app } = await seededApp();
     const res = await app.request("/v1/firms/wombat/opportunity-runs?status=not-a-status");
     expect(res.status).toBe(400);
   });
 
-  it("gets one run by id", async () => {
-    const app = await seededApp();
-    const res = await app.request(`/v1/firms/wombat/opportunity-runs/${PRAI_NAB_DESK_FIXTURE_IDS.runId}`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as DeskOpportunityRunResponse;
-    expect(body.opportunityRun.runId).toBe(PRAI_NAB_DESK_FIXTURE_IDS.runId);
+  it("returns 404 for the wrong firm and does not leak lists", async () => {
+    const { app } = await seededApp();
+    await expectCrossFirmIsolation(app);
+  });
+});
+
+describe("Desk / job auth stub", () => {
+  const apiKey = "test-desk-key";
+  const bearer = { Authorization: `Bearer ${apiKey}` };
+  const header = { "X-Api-Key": apiKey };
+
+  it("is open when no API key is configured (Amy local / fixture path)", async () => {
+    const { app } = await seededApp();
+    expect((await app.request("/v1/firms/wombat/jobs")).status).toBe(200);
+    expect((await app.request("/health")).status).toBe(200);
+  });
+
+  it("requires Bearer or X-Api-Key when a key is configured", async () => {
+    const { app } = await seededApp({ apiKey });
+    expect((await app.request("/health")).status).toBe(200);
+    expect((await app.request("/v1/firms/wombat/jobs")).status).toBe(401);
+    expect((await app.request("/v1/firms/wombat/jobs", { headers: { Authorization: "Bearer nope" } })).status).toBe(
+      401,
+    );
+    expect((await app.request("/v1/firms/wombat/jobs", { headers: bearer })).status).toBe(200);
+    expect((await app.request("/v1/firms/wombat/jobs", { headers: header })).status).toBe(200);
+    expect(
+      (await app.request(`/v1/firms/wombat/jobs/${PRAI_NAB_DESK_FIXTURE_IDS.valuationJobId}`, { headers: bearer }))
+        .status,
+    ).toBe(200);
+  });
+});
+
+describe("firm-scoped job create + audit", () => {
+  it("creates under /v1/firms/:firmId/jobs and stamps firm_id + requester on audit", async () => {
+    const { app } = await seededApp();
+    const res = await app.request("/v1/firms/wombat/jobs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "valuation.lender",
+        requestedBy: "seat:andre",
+        input: { fixture: true, lenderCode: "NAB" },
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      firmId: string;
+      job: {
+        firmId: string;
+        requestedBy: string;
+        audit: Array<{ firmId?: string; requester?: string; detail?: Record<string, unknown> }>;
+      };
+    };
     expect(body.firmId).toBe(WOMBAT_FIRM_ID);
-  });
-
-  it("lists linked val/pricing/matrix jobs for the seeded run", async () => {
-    const app = await seededApp();
-    const all = await app.request("/v1/firms/wombat/jobs");
-    expect(all.status).toBe(200);
-    expect(((await all.json()) as DeskJobListResponse).jobs).toHaveLength(3);
-
-    const filtered = await app.request(
-      `/v1/firms/wombat/jobs?runId=${PRAI_NAB_DESK_FIXTURE_IDS.runId}`,
-    );
-    const jobs = ((await filtered.json()) as DeskJobListResponse).jobs;
-    expect(jobs.map((job) => job.jobId).sort()).toEqual(
-      [
-        PRAI_NAB_DESK_FIXTURE_IDS.valuationJobId,
-        PRAI_NAB_DESK_FIXTURE_IDS.pricingJobId,
-        PRAI_NAB_DESK_FIXTURE_IDS.matrixJobId,
-      ].sort(),
-    );
-  });
-
-  it("gets one job by id with the full envelope", async () => {
-    const app = await seededApp();
-    const res = await app.request(`/v1/firms/wombat/jobs/${PRAI_NAB_DESK_FIXTURE_IDS.valuationJobId}`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as DeskJobResponse;
-    expect(body.job.jobId).toBe(PRAI_NAB_DESK_FIXTURE_IDS.valuationJobId);
     expect(body.job.firmId).toBe(WOMBAT_FIRM_ID);
-    expect(body.job.kind).toBe("valuation.lender");
-    expect(body.job.output).toMatchObject({ valueAud: 1025000, lenderCode: "NAB" });
+    expect(body.job.requestedBy).toBe("seat:andre");
+    const created = body.job.audit.find((event) => event.detail?.kind === "valuation.lender");
+    expect(created?.firmId).toBe(WOMBAT_FIRM_ID);
+    expect(created?.requester).toBe("seat:andre");
+    expect(created?.detail).toMatchObject({ firm_id: WOMBAT_FIRM_ID, requester: "seat:andre" });
   });
 
-  it("returns 404 for unknown firm, run, or job", async () => {
-    const app = await seededApp();
-    expect((await app.request("/v1/firms/other/opportunity-runs")).status).toBe(404);
-    expect((await app.request("/v1/firms/wombat/opportunity-runs/missing")).status).toBe(404);
-    expect((await app.request("/v1/firms/wombat/jobs/missing")).status).toBe(404);
+  it("404s create on the wrong firm", async () => {
+    const { app } = await seededApp();
+    const res = await app.request("/v1/firms/acme/jobs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "valuation.lender",
+        requestedBy: "seat:andre",
+        input: { fixture: true },
+      }),
+    });
+    expect(res.status).toBe(404);
   });
 });
