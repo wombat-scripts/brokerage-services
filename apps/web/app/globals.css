@@ -468,6 +468,7 @@ a.tool-card:hover .tool-cue {
 .tool-card.soon {
   color: var(--ink-soft);
   background: rgba(247, 241, 230, 0.55);
+  border-style: dashed;
 }
 
 .tool-card.soon .tool-cue {
