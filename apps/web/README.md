@@ -101,7 +101,7 @@ Other fixture-only rows (CBA Saving No, WBC unknown / awaiting MFA, Chen househo
 | --- | --- |
 | `DESK_GATE_PASSWORD` | If set, `/login` is required. If unset, the desk is open and the chrome says “Signed in as Tom”. |
 | `DESK_API_BASE_URL` | If set, Desk uses `HttpDeskSource` against that origin. If unset, fixtures. |
-| `DESK_API_KEY` | Optional. If set, every Desk API request sends `Authorization: Bearer <key>` (API also accepts `X-Api-Key`). If unset, no auth headers — matches an open API when Andre has not flipped the key. |
+| `DESK_API_KEY` | Optional. Same secret as the API (`docs/desk-api.md`). If set, every Desk API request sends `Authorization: Bearer <key>`. If unset, no auth headers — open local/fixture path still works. |
 | `DESK_FIRM_ID` | Firm path segment. Default `wombat`. |
 | `DESK_DATA_SOURCE` | Optional. `api` without `DESK_API_BASE_URL` is an error. |
 
