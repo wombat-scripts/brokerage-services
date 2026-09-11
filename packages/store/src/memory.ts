@@ -1,6 +1,12 @@
 import type { Job, JobStatus, OpportunityRun } from "@wombat/contracts";
-import { WOMBAT_FIRM_ID, assertWombatFirmId } from "@wombat/contracts";
-import type { BrokerageStore, JobStore, OpportunityRunStore } from "./types.js";
+import { WOMBAT_FIRM_ID, assertWombatFirmId, resolveOpportunityRunStatus } from "@wombat/contracts";
+import type {
+  BrokerageStore,
+  JobStore,
+  ListJobsQuery,
+  ListOpportunityRunsQuery,
+  OpportunityRunStore,
+} from "./types.js";
 
 class MemoryJobStore implements JobStore {
   private readonly jobs = new Map<string, Job>();
@@ -37,6 +43,14 @@ class MemoryJobStore implements JobStore {
       .slice(0, limit)
       .map((job) => structuredClone(job));
   }
+
+  async list(query: ListJobsQuery): Promise<Job[]> {
+    assertWombatFirmId(query.firmId);
+    return [...this.jobs.values()]
+      .filter((job) => job.firmId === query.firmId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((job) => structuredClone(job));
+  }
 }
 
 class MemoryOpportunityRunStore implements OpportunityRunStore {
@@ -55,6 +69,17 @@ class MemoryOpportunityRunStore implements OpportunityRunStore {
   async get(runId: string): Promise<OpportunityRun | null> {
     const run = this.runs.get(runId);
     return run ? structuredClone(run) : null;
+  }
+
+  async list(query: ListOpportunityRunsQuery): Promise<OpportunityRun[]> {
+    assertWombatFirmId(query.firmId);
+    const clientNeedle = query.client?.trim().toLowerCase();
+    return [...this.runs.values()]
+      .filter((run) => run.firmId === query.firmId)
+      .filter((run) => !clientNeedle || run.clientPageId.toLowerCase().includes(clientNeedle))
+      .filter((run) => !query.status || resolveOpportunityRunStatus(run) === query.status)
+      .sort((a, b) => b.ranAt.localeCompare(a.ranAt))
+      .map((run) => structuredClone(run));
   }
 
   async voidRun(runId: string, reason: string): Promise<void> {

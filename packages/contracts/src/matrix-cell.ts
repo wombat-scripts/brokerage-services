@@ -40,6 +40,15 @@ export function computeDeltaBp(currentRate: number, newRate: number): number {
   return Math.round((currentRate - newRate) * 10000);
 }
 
+/** Approximate annual interest delta in AUD: balance * (current - new), nearest dollar. */
+export function computeDeltaAudPa(
+  loanBalanceAud: number,
+  currentRate: number,
+  newRate: number,
+): number {
+  return Math.round(loanBalanceAud * (currentRate - newRate));
+}
+
 /**
  * Saving Yes is a flag for Tom — not advice and not an auto-email.
  * Positive delta (new rate lower than current) → yes.

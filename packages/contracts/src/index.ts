@@ -4,5 +4,6 @@ export * from "./valuation.js";
 export * from "./pricing.js";
 export * from "./matrix-cell.js";
 export * from "./opportunity-run.js";
+export * from "./desk-api.js";
 export * from "./crm.js";
 export * from "./vault.js";

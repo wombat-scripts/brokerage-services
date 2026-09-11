@@ -9,6 +9,7 @@ export type { NotionPagesClient, NotionPageSnapshot } from "./client.js";
 export {
   LOAN_WRITABLE_FIELDS,
   NOTION_LOANS,
+  NOTION_OPPORTUNITY_RUNS,
   NOTION_PROPERTIES,
   appendCitation,
   assertNoInterestRate,
@@ -16,5 +17,6 @@ export {
   buildOpportunityRunPageProperties,
   buildPropertySummaryProperties,
   citationLine,
+  mapLenderSelect,
   mergeOpportunityTypes,
 } from "./mapping.js";

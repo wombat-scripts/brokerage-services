@@ -60,6 +60,7 @@ describe("Prai × NAB fixture matrix_cell", () => {
       currentRate: 0.065,
       newRate: 0.0605,
       deltaBp: 45,
+      deltaAudPaEstimate: 3600,
       rankHint: "stay_reprice",
     });
 
@@ -76,6 +77,8 @@ describe("Prai × NAB fixture matrix_cell", () => {
       newRate: 0.0605,
       savingFlag: "yes",
       deltaBp: 45,
+      deltaAudPa: 3600,
+      status: "succeeded",
       valuationJobId: valuation.jobId,
       pricingJobId: pricing.jobId,
       matrixJobId: matrix.jobId,

@@ -5,11 +5,18 @@ import pg from "pg";
 import {
   WOMBAT_FIRM_ID,
   assertWombatFirmId,
+  resolveOpportunityRunStatus,
   type Job,
   type JobStatus,
   type OpportunityRun,
 } from "@wombat/contracts";
-import type { BrokerageStore, JobStore, OpportunityRunStore } from "./types.js";
+import type {
+  BrokerageStore,
+  JobStore,
+  ListJobsQuery,
+  ListOpportunityRunsQuery,
+  OpportunityRunStore,
+} from "./types.js";
 
 const { Pool } = pg;
 
@@ -68,6 +75,7 @@ function rowToRun(row: Record<string, unknown>): OpportunityRun {
     ...(row.new_rate !== null && row.new_rate !== undefined ? { newRate: Number(row.new_rate) } : {}),
     savingFlag: row.saving_flag as OpportunityRun["savingFlag"],
     ...(row.delta_bp !== null && row.delta_bp !== undefined ? { deltaBp: Number(row.delta_bp) } : {}),
+    status: row.voided_at ? "voided" : "succeeded",
     valuationJobId: String(row.valuation_job_id),
     pricingJobId: String(row.pricing_job_id),
     matrixJobId: String(row.matrix_job_id),
@@ -139,6 +147,15 @@ class PostgresJobStore implements JobStore {
     );
     return result.rows.map(rowToJob);
   }
+
+  async list(query: ListJobsQuery): Promise<Job[]> {
+    assertWombatFirmId(query.firmId);
+    const result = await this.db.query(
+      `SELECT * FROM jobs WHERE firm_id = $1 ORDER BY created_at DESC`,
+      [query.firmId],
+    );
+    return result.rows.map(rowToJob);
+  }
 }
 
 class PostgresOpportunityRunStore implements OpportunityRunStore {
@@ -200,6 +217,20 @@ class PostgresOpportunityRunStore implements OpportunityRunStore {
     const result = await this.db.query(`SELECT * FROM opportunity_runs WHERE run_id = $1`, [runId]);
     const row = result.rows[0];
     return row ? rowToRun(row) : null;
+  }
+
+  async list(query: ListOpportunityRunsQuery): Promise<OpportunityRun[]> {
+    assertWombatFirmId(query.firmId);
+    const result = await this.db.query(
+      `SELECT * FROM opportunity_runs
+       WHERE firm_id = $1
+         AND ($2::text IS NULL OR client_page_id ILIKE '%' || $2 || '%')
+       ORDER BY ran_at DESC`,
+      [query.firmId, query.client ?? null],
+    );
+    return result.rows
+      .map(rowToRun)
+      .filter((run) => !query.status || resolveOpportunityRunStatus(run) === query.status);
   }
 
   async voidRun(runId: string, reason: string): Promise<void> {

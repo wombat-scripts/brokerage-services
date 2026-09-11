@@ -12,7 +12,7 @@ This repo is separate from Amy’s `wombat-website`. No live NAB or CoreLogic po
 | `packages/notion-adapter` | `CrmWriteBackAdapter` for Notion. Fail closed. Cites `sourceRunId`. Never writes Loans **Interest Rate** |
 | `packages/bitwarden-vault` | Vendor-agnostic `CredentialVault` behind a Bitwarden Secrets Manager / machine-account stub |
 | `packages/store` | Job store + append-only `opportunity_runs` (memory for tests; Postgres for runtime) |
-| `apps/api` | Thin Hono API: `POST /jobs`, `GET /jobs/:jobId` |
+| `apps/api` | Thin Hono API: `POST /jobs`, `GET /jobs/:jobId`, plus Desk reads under `/v1/firms/:firmId` |
 | `apps/worker` | Processes jobs. `opportunity.matrix_cell` composes val + price and writes via adapters |
 | `db/migrations` | SQL for `jobs` and `opportunity_runs` |
 
@@ -164,7 +164,20 @@ Adapter is the only job path that mutates CRM.
 
 **Loans:** merge `Opportunity Type` (`Reprice` / `Refinance` / `Retention review` as appropriate), `Opportunity Status`, `Do This Next`. **Never overwrite `Interest Rate`** from a competitor quote. Current rate is read from the Notion loan row until Tom says otherwise.
 
-**Opportunity Runs:** append-only. Service store is Postgres. Notion projection needs `NOTION_OPPORTUNITY_RUNS_DATABASE_ID` (DB not created yet). Without token + DB id the adapter **fail-closes** and the job is `failed` / retryable. `NOTION_DRY_RUN=true` is local-only.
+**Opportunity Runs:** append-only. Service store is Postgres (or the in-memory fixture store). Live Notion DB id is `54120476-0e40-4887-b457-0ff486ecb205` — set `NOTION_OPPORTUNITY_RUNS_DATABASE_ID`. Without token + DB id the adapter **fail-closes** and the job is `failed` / retryable. `NOTION_DRY_RUN=true` is local-only. The adapter maps Phase 0 run fields onto the live property names (Name, Run ID, firm_id, Client, Property, Loan, lenders, balances, val, LVR, rates, Saving Flag, deltas, job ids, Status, Requested By, Ran At, Notes). It never writes Loans **Interest Rate**.
+
+## Desk read APIs (Amy)
+
+Documented in [docs/desk-api.md](docs/desk-api.md). When Postgres is not configured the API seeds the Prai × NAB fixture (`01JPHASE11PRAI0001` + linked val/pricing/matrix jobs) so Desk can consume stable JSON without a Notion token.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/v1/firms/:firmId/opportunity-runs` | Optional `client`, `status` |
+| `GET` | `/v1/firms/:firmId/opportunity-runs/:runId` | One run |
+| `GET` | `/v1/firms/:firmId/jobs` | Optional `runId` |
+| `GET` | `/v1/firms/:firmId/jobs/:jobId` | Full `Job` envelope |
+
+`firmId` must be `wombat`.
 
 ## Out of scope (Phase 1)
 
