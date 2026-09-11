@@ -1,0 +1,20 @@
+{
+  "name": "@wombat/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@wombat/bitwarden-vault": "workspace:*",
+    "@wombat/contracts": "workspace:*",
+    "@wombat/notion-adapter": "workspace:*",
+    "@wombat/store": "workspace:*",
+    "ulid": "^2.4.0"
+  }
+}

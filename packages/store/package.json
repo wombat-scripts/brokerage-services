@@ -1,0 +1,19 @@
+{
+  "name": "@wombat/store",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "migrate": "tsx src/migrate-cli.ts"
+  },
+  "dependencies": {
+    "@wombat/contracts": "workspace:*",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.2"
+  }
+}

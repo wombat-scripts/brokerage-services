@@ -1,0 +1,21 @@
+{
+  "name": "@wombat/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.1",
+    "@wombat/contracts": "workspace:*",
+    "@wombat/store": "workspace:*",
+    "@wombat/worker": "workspace:*",
+    "hono": "^4.7.7",
+    "zod": "^3.24.4"
+  }
+}
