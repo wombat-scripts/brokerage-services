@@ -11,7 +11,7 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
-    "@wombat/bitwarden-vault": "workspace:*",
+    "@wombat/gcp-vault": "workspace:*",
     "@wombat/contracts": "workspace:*",
     "@wombat/notion-adapter": "workspace:*",
     "@wombat/store": "workspace:*",

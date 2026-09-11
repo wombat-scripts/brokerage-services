@@ -1,4 +1,4 @@
-import { createBitwardenVaultFromEnv } from "@wombat/bitwarden-vault";
+import { createGcpVaultFromEnv } from "@wombat/gcp-vault";
 import { createNotionAdapterFromEnv } from "@wombat/notion-adapter";
 import { createMemoryStore, createPgPool, createPostgresStore, type BrokerageStore } from "@wombat/store";
 
@@ -19,6 +19,6 @@ export function createWorkerStore(): { store: BrokerageStore; close?: () => Prom
 export function createWorkerAdapters() {
   return {
     crm: createNotionAdapterFromEnv(),
-    vault: createBitwardenVaultFromEnv(),
+    vault: createGcpVaultFromEnv(),
   };
 }

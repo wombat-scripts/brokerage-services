@@ -8,8 +8,8 @@ const { store } = createWorkerStore();
 if (!process.env.DATABASE_URL) {
   await seedPraiNabDeskFixtures(store);
 }
-const { crm } = createWorkerAdapters();
-const app = createApi(store, crm, resolveDeskAuthConfig());
+const { crm, vault } = createWorkerAdapters();
+const app = createApi(store, crm, resolveDeskAuthConfig(), vault);
 const port = Number(process.env.API_PORT ?? 3000);
 const hostname = process.env.API_HOST ?? "127.0.0.1";
 

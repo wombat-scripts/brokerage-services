@@ -1,7 +1,13 @@
-import { appendJobAudit, type CrmWriteBackAdapter, type Job } from "@wombat/contracts";
+import {
+  appendJobAudit,
+  type CredentialVault,
+  type CrmWriteBackAdapter,
+  type Job,
+} from "@wombat/contracts";
 import type { BrokerageStore } from "@wombat/store";
 import { handleMatrixCell } from "./handlers/matrix-cell.js";
 import { handlePricingLender } from "./handlers/pricing-lender.js";
+import { handleValuationCorelogic } from "./handlers/valuation-corelogic.js";
 import { handleValuationLender } from "./handlers/valuation-lender.js";
 import { touchJob } from "./jobs.js";
 
@@ -9,6 +15,7 @@ export async function processJob(
   job: Job,
   store: BrokerageStore,
   crm: CrmWriteBackAdapter,
+  vault?: CredentialVault,
 ): Promise<Job> {
   const started = touchJob(job, {
     status: "running",
@@ -18,7 +25,7 @@ export async function processJob(
   await store.jobs.update(started);
 
   try {
-    const processed = await dispatch(started, store, crm);
+    const processed = await dispatch(started, store, crm, vault);
     await store.jobs.update(processed);
     return processed;
   } catch (error) {
@@ -38,12 +45,15 @@ async function dispatch(
   job: Job,
   store: BrokerageStore,
   crm: CrmWriteBackAdapter,
+  vault?: CredentialVault,
 ): Promise<Job> {
   switch (job.kind) {
     case "valuation.lender":
-      return handleValuationLender(job);
+      return handleValuationLender(job, vault);
+    case "valuation.corelogic_avm":
+      return handleValuationCorelogic(job, vault);
     case "pricing.lender":
-      return handlePricingLender(job, store.jobs);
+      return handlePricingLender(job, store.jobs, vault);
     case "opportunity.matrix_cell":
       return handleMatrixCell(job, store, crm);
     default:
@@ -63,12 +73,13 @@ async function dispatch(
 export async function processQueuedJobs(
   store: BrokerageStore,
   crm: CrmWriteBackAdapter,
+  vault?: CredentialVault,
   limit = 10,
 ): Promise<Job[]> {
   const queued = await store.jobs.listByStatus("queued", limit);
   const results: Job[] = [];
   for (const job of queued) {
-    results.push(await processJob(job, store, crm));
+    results.push(await processJob(job, store, crm, vault));
   }
   return results;
 }

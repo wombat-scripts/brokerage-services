@@ -10,7 +10,7 @@ This repo is separate from Amy’s `wombat-website`. No live NAB or CoreLogic po
 | --- | --- |
 | `packages/contracts` | Job envelope, JobKind, ArtefactRef, AuditEvent, val/price/matrix I/O, Opportunity Run, FirmId (`wombat`), CRM + vault interfaces |
 | `packages/notion-adapter` | `CrmWriteBackAdapter` for Notion. Fail closed. Cites `sourceRunId`. Never writes Loans **Interest Rate** |
-| `packages/bitwarden-vault` | Vendor-agnostic `CredentialVault` behind a Bitwarden Secrets Manager / machine-account stub |
+| `packages/gcp-vault` | Vendor-agnostic `CredentialVault` behind a GCP Secret Manager adapter (fixture client in CI) |
 | `packages/store` | Job store + append-only `opportunity_runs` (memory for tests; Postgres for runtime) |
 | `apps/api` | Thin Hono API: firm-scoped Desk + jobs under `/v1/firms/:firmId`, plus wombat aliases `POST /jobs` and `GET /jobs/:jobId` |
 | `apps/worker` | Processes jobs. `opportunity.matrix_cell` composes val + price and writes via adapters |
@@ -48,7 +48,7 @@ pnpm dev:web
 
 Open http://localhost:3001 for the Desk tools hub, then `/matrix` for Prai × NAB Saving Yes. Set `DESK_API_BASE_URL=http://127.0.0.1:3000` to read Andre’s Phase 1.1 Desk API instead. Details: `apps/web/README.md`.
 
-Local `pnpm test` uses the in-memory store and a mocked Notion adapter. It does **not** need Postgres, Bitwarden, or a Notion token. CI starts a Postgres service, runs `pnpm migrate`, and fails if Desk list/get against Postgres regresses.
+Local `pnpm test` uses the in-memory store, a mocked Notion adapter, and a fixture Secret Manager client. It does **not** need Postgres, GCP credentials, or a Notion token. CI starts a Postgres service, runs `pnpm migrate`, and fails if Desk list/get against Postgres regresses.
 
 ## How seats call a job
 
@@ -148,6 +148,7 @@ Memory store is process-local. Two processes **must** share Postgres.
 Prefer **Australian** regions for:
 
 - Postgres (job bus + `opportunity_runs` + audit) — Neon or Supabase **Sydney**
+- GCP Secret Manager — user-managed replicas in **australia-southeast1** only
 - Workers / browser runners (later)
 - Encrypted Playwright `storageState`
 
@@ -155,19 +156,39 @@ Orchestrating seats can live elsewhere. Pin the job bus and artefacts to AU. Thi
 
 Local Docker Postgres is **not** AU-resident; it is only for development. Local tests stay in-memory unless `DATABASE_URL` is set. CI always opens the service-container Postgres.
 
-## Bitwarden Secrets Manager / machine accounts
+## GCP Secret Manager (CredentialVault)
 
-Vault path (locked): Bitwarden cloud now → self-host Sydney later.
+Bitwarden Secrets Manager is cancelled. The Phase 0 `CredentialVault` interface stays vendor-agnostic; `packages/gcp-vault` is the adapter.
 
-- Design against **Secrets Manager / machine accounts**
-- Keep the `CredentialVault` interface vendor-agnostic (`packages/bitwarden-vault` is one adapter)
-- Phase 1 runtime returns `awaiting_attended_mfa` until secrets exist
-- **Never** log or commit secrets. `.env.example` is placeholders only
-- Machine accounts and access tokens **do not migrate** on self-host — recreate them
-- Google Password Manager stays an operator store, not a service backend
-- SMS/email MFA stays attended. Passkeys are a hard block for automation
+Locked vault (Tom/Matt 11 Sep 2026):
 
-Required env (placeholders): `BITWARDEN_API_URL`, `BITWARDEN_ACCESS_TOKEN`, `BITWARDEN_ORGANIZATION_ID`, `BITWARDEN_PROJECT_ID`.
+- Backend: GCP Secret Manager, **user-managed replication in `australia-southeast1` only** (not Automatic)
+- Project ID: `wombat-brokerage-services`
+- Project number: `709295017178`
+- Org: wombathomeloans.com.au
+
+Secret **names** (never commit values):
+
+| Secret | Job kinds | Payload shape |
+| --- | --- | --- |
+| `wombat-nab-broker-portal` | `valuation.lender` / `pricing.lender` when `lenderCode=NAB` | `{ "username", "password", "totp_seed"? }` |
+| `wombat-corelogic-property-hub` | `valuation.corelogic_avm` | `{ "portal": "corelogic_property_hub", "entry_email", "username", "password", "mfa_mode", "mfa_email_hint"? }` |
+
+CoreLogic / Cotality flow (attended): email gate → Property Hub username/password → Ping email OTP. **Never store OTP codes.** `mfa_mode=email_attended` (or `attended` / `push`) surfaces job status `awaiting_attended_mfa`. When `totp_seed` is present the unlock status is `ready` (TOTP-managed). Do not log the seed. There is still **no live portal scrape**.
+
+Worker auth:
+
+- Prefer Application Default Credentials / workload identity on the AU host
+- Interim: a service account with `roles/secretmanager.secretAccessor` only
+- Optional `GOOGLE_APPLICATION_CREDENTIALS` = absolute path to that JSON for local/CI. **Do not commit the file or paste it in chat**
+- `GCP_VAULT_MODE=fixture` (default, CI) uses an in-process mock client — no GCP network
+- `GCP_VAULT_MODE=live` uses Secret Manager via ADC
+
+Env: `GCP_PROJECT_ID`, `GCP_SECRET_NAB`, `GCP_SECRET_CORELOGIC`, optional `GCP_SECRET_LOCATION`, `GCP_VAULT_MODE`, `GOOGLE_APPLICATION_CREDENTIALS`.
+
+Callers receive metadata only (`secretId`, `kind`, `mfaMode`, `usernameHint`). Passwords and totp seeds never enter job output, audit, or logs.
+
+Google Password Manager stays an operator store, not a service backend. Passkeys remain a hard block for automation.
 
 ## Notion write-back
 

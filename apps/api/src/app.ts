@@ -6,6 +6,7 @@ import {
   deskOpportunityRunListQuerySchema,
   jobKindSchema,
   subjectRefsSchema,
+  type CredentialVault,
   type CrmWriteBackAdapter,
 } from "@wombat/contracts";
 import type { BrokerageStore } from "@wombat/store";
@@ -47,6 +48,7 @@ async function createFirmJob(
   store: BrokerageStore,
   crm: CrmWriteBackAdapter | undefined,
   body: z.infer<typeof createJobBodySchema>,
+  vault?: CredentialVault,
 ) {
   const input = {
     ...body.input,
@@ -61,7 +63,7 @@ async function createFirmJob(
     }),
   );
   if (process.env.INLINE_WORKER === "true" && crm) {
-    job = await processJob(job, store, crm);
+    job = await processJob(job, store, crm, vault);
   }
   return job;
 }
@@ -70,6 +72,7 @@ export function createApi(
   store: BrokerageStore,
   crm?: CrmWriteBackAdapter,
   auth: DeskAuthConfig = {},
+  vault?: CredentialVault,
 ) {
   const app = new Hono();
 
@@ -97,7 +100,7 @@ export function createApi(
     if (!parsed.success) {
       return c.json({ error: parsed.error.flatten() }, 400);
     }
-    const job = await createFirmJob(store, crm, parsed.data);
+    const job = await createFirmJob(store, crm, parsed.data, vault);
     return c.json({ job }, 201);
   });
 
@@ -132,7 +135,7 @@ export function createApi(
     if (parsed.data.firmId && parsed.data.firmId !== firmId) {
       return c.json({ error: { message: "firmId mismatch" } }, 400);
     }
-    const job = await createFirmJob(store, crm, parsed.data);
+    const job = await createFirmJob(store, crm, parsed.data, vault);
     return c.json({ firmId, job }, 201);
   });
 

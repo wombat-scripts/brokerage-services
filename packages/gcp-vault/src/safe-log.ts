@@ -1,5 +1,5 @@
 const SECRET_KEY_PATTERN =
-  /(password|secret|token|totp|otp|credential|authorization|access_key|api_key)/i;
+  /(password|secret|token|totp|otp|credential|authorization|access_key|api_key|seed)/i;
 
 export function redactSecrets(value: unknown): unknown {
   if (typeof value === "string") {
