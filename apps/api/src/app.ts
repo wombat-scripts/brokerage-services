@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   WOMBAT_FIRM_ID,
+  deskJobListQuerySchema,
+  deskOpportunityRunListQuerySchema,
   jobKindSchema,
   subjectRefsSchema,
   type CrmWriteBackAdapter,
@@ -16,6 +18,29 @@ const createJobBodySchema = z.object({
   input: z.record(z.unknown()),
   subjectRefs: subjectRefsSchema.optional(),
 });
+
+function firmNotFound() {
+  return { error: { message: "firm not found" } };
+}
+
+function requireWombatFirm(firmId: string): firmId is typeof WOMBAT_FIRM_ID {
+  return firmId === WOMBAT_FIRM_ID;
+}
+
+function jobLinkedToRun(
+  job: { jobId: string; output?: unknown },
+  run: { valuationJobId: string; pricingJobId: string; matrixJobId: string; runId: string },
+): boolean {
+  if (
+    job.jobId === run.valuationJobId ||
+    job.jobId === run.pricingJobId ||
+    job.jobId === run.matrixJobId
+  ) {
+    return true;
+  }
+  const output = job.output as { opportunityRunId?: string } | undefined;
+  return output?.opportunityRunId === run.runId;
+}
 
 export function createApi(store: BrokerageStore, crm?: CrmWriteBackAdapter) {
   const app = new Hono();
@@ -69,6 +94,71 @@ export function createApi(store: BrokerageStore, crm?: CrmWriteBackAdapter) {
       startedAt: job.startedAt,
       finishedAt: job.finishedAt,
     });
+  });
+
+  app.get("/v1/firms/:firmId/opportunity-runs", async (c) => {
+    const firmId = c.req.param("firmId");
+    if (!requireWombatFirm(firmId)) {
+      return c.json(firmNotFound(), 404);
+    }
+    const parsed = deskOpportunityRunListQuerySchema.safeParse({
+      client: c.req.query("client") || undefined,
+      status: c.req.query("status") || undefined,
+    });
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.flatten() }, 400);
+    }
+    const opportunityRuns = await store.opportunityRuns.list({
+      firmId,
+      ...parsed.data,
+    });
+    return c.json({ firmId, opportunityRuns });
+  });
+
+  app.get("/v1/firms/:firmId/opportunity-runs/:runId", async (c) => {
+    const firmId = c.req.param("firmId");
+    if (!requireWombatFirm(firmId)) {
+      return c.json(firmNotFound(), 404);
+    }
+    const opportunityRun = await store.opportunityRuns.get(c.req.param("runId"));
+    if (!opportunityRun || opportunityRun.firmId !== firmId) {
+      return c.json({ error: { message: "opportunity run not found" } }, 404);
+    }
+    return c.json({ firmId, opportunityRun });
+  });
+
+  app.get("/v1/firms/:firmId/jobs", async (c) => {
+    const firmId = c.req.param("firmId");
+    if (!requireWombatFirm(firmId)) {
+      return c.json(firmNotFound(), 404);
+    }
+    const parsed = deskJobListQuerySchema.safeParse({
+      runId: c.req.query("runId") || undefined,
+    });
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.flatten() }, 400);
+    }
+    let jobs = await store.jobs.list({ firmId });
+    if (parsed.data.runId) {
+      const run = await store.opportunityRuns.get(parsed.data.runId);
+      if (!run || run.firmId !== firmId) {
+        return c.json({ firmId, jobs: [] });
+      }
+      jobs = jobs.filter((job) => jobLinkedToRun(job, run));
+    }
+    return c.json({ firmId, jobs });
+  });
+
+  app.get("/v1/firms/:firmId/jobs/:jobId", async (c) => {
+    const firmId = c.req.param("firmId");
+    if (!requireWombatFirm(firmId)) {
+      return c.json(firmNotFound(), 404);
+    }
+    const job = await store.jobs.get(c.req.param("jobId"));
+    if (!job || job.firmId !== firmId) {
+      return c.json({ error: { message: "job not found" } }, 404);
+    }
+    return c.json({ firmId, job });
   });
 
   return app;

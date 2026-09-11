@@ -1,5 +1,6 @@
 import { ulid } from "ulid";
 import {
+  computeDeltaAudPa,
   computeDeltaBp,
   computeLvr,
   computeSavingFlag,
@@ -57,6 +58,10 @@ export async function handleMatrixCell(
   const savingFlag = computeSavingFlag({ currentRate, newRate });
   const deltaBp =
     currentRate !== undefined && newRate !== undefined ? computeDeltaBp(currentRate, newRate) : undefined;
+  const deltaAudPa =
+    currentRate !== undefined && newRate !== undefined
+      ? computeDeltaAudPa(priceIn.loanBalanceAud, currentRate, newRate)
+      : undefined;
   const currentLenderCode = input.currentLenderCode ?? input.targetLenderCode;
   const rankHint = rankFor(savingFlag, currentLenderCode, input.targetLenderCode);
   const ranAt = new Date().toISOString();
@@ -82,6 +87,8 @@ export async function handleMatrixCell(
     ...(newRate !== undefined ? { newRate } : {}),
     savingFlag,
     ...(deltaBp !== undefined ? { deltaBp } : {}),
+    ...(deltaAudPa !== undefined ? { deltaAudPa } : {}),
+    status: "succeeded",
     valuationJobId: valuation.jobId,
     pricingJobId: pricing.jobId,
     matrixJobId: job.jobId,
@@ -121,6 +128,7 @@ export async function handleMatrixCell(
     ...(currentRate !== undefined ? { currentRate } : {}),
     ...(newRate !== undefined ? { newRate } : {}),
     ...(deltaBp !== undefined ? { deltaBp } : {}),
+    ...(deltaAudPa !== undefined ? { deltaAudPaEstimate: deltaAudPa } : {}),
     ...(rankHint ? { rankHint } : {}),
   };
 

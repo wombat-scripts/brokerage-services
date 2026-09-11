@@ -12,6 +12,11 @@ export const opportunityValSourceSchema = z.enum([
 
 export type OpportunityValSource = z.infer<typeof opportunityValSourceSchema>;
 
+/** Notion Opportunity Runs Status select (Phase 1.1 live DB). */
+export const opportunityRunStatusSchema = z.enum(["succeeded", "failed", "unknown", "voided"]);
+
+export type OpportunityRunStatus = z.infer<typeof opportunityRunStatusSchema>;
+
 export const opportunityRunSchema = z.object({
   runId: z.string().min(1),
   firmId: firmIdSchema,
@@ -32,6 +37,8 @@ export const opportunityRunSchema = z.object({
   newRate: z.number().optional(),
   savingFlag: savingFlagSchema,
   deltaBp: z.number().optional(),
+  deltaAudPa: z.number().optional(),
+  status: opportunityRunStatusSchema.optional(),
   valuationJobId: z.string().min(1),
   pricingJobId: z.string().min(1),
   matrixJobId: z.string().min(1),
@@ -42,3 +49,8 @@ export const opportunityRunSchema = z.object({
 });
 
 export type OpportunityRun = z.infer<typeof opportunityRunSchema>;
+
+export function resolveOpportunityRunStatus(run: OpportunityRun): OpportunityRunStatus {
+  if (run.voidedAt) return "voided";
+  return run.status ?? "succeeded";
+}
