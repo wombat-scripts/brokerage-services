@@ -1,10 +1,8 @@
+/** Keys that must never be logged. Do not match metadata like secretId or mfaMode. */
 const SECRET_KEY_PATTERN =
-  /(password|secret|token|totp|otp|credential|authorization|access_key|api_key)/i;
+  /^(password|secret|token|totp|totp_seed|otp|credentials?|authorization|access_key|api_key|seed)$/i;
 
 export function redactSecrets(value: unknown): unknown {
-  if (typeof value === "string") {
-    return SECRET_KEY_PATTERN.test(value) ? "[redacted]" : value;
-  }
   if (Array.isArray(value)) {
     return value.map(redactSecrets);
   }

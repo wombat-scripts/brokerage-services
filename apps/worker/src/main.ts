@@ -3,7 +3,7 @@ import { createWorkerAdapters, createWorkerStore } from "./runtime.js";
 
 const pollMs = Number(process.env.WORKER_POLL_MS ?? 1000);
 const { store, close } = createWorkerStore();
-const { crm } = createWorkerAdapters();
+const { crm, vault } = createWorkerAdapters();
 
 console.info("brokerage-services worker started", {
   store: process.env.DATABASE_URL ? "postgres" : "memory",
@@ -20,7 +20,7 @@ process.on("SIGTERM", () => {
 });
 
 while (!stopping) {
-  await processQueuedJobs(store, crm);
+  await processQueuedJobs(store, crm, vault);
   await new Promise((resolve) => setTimeout(resolve, pollMs));
 }
 

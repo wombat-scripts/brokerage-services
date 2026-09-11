@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { firmIdSchema, type FirmId } from "./firm.js";
+import type { JobKind } from "./job.js";
 
 export const vaultSecretKindSchema = z.enum(["lender_portal", "corelogic", "quickli", "other"]);
 
@@ -21,8 +22,8 @@ export type VaultSecretMeta = z.infer<typeof vaultSecretMetaSchema>;
 export type UnlockStatus = "ready" | "awaiting_attended_mfa";
 
 /**
- * Vendor-agnostic vault. Bitwarden Secrets Manager is the Phase 1 adapter.
- * Implementations must never return passwords to LLM / skills / logs.
+ * Vendor-agnostic vault. GCP Secret Manager is the Phase 1 adapter.
+ * Implementations must never return passwords or totp seeds to LLM / skills / logs.
  */
 export interface CredentialVault {
   list(firmId: FirmId): Promise<VaultSecretMeta[]>;
@@ -47,4 +48,28 @@ export interface CredentialVault {
   }): Promise<void>;
 
   revoke(unlockId: string): Promise<void>;
+}
+
+/** Map a job to the vault secret kind. Phase 1: NAB portal + CoreLogic Property Hub only. */
+export function vaultKindForJob(jobKind: JobKind, lenderCode?: string): VaultSecretKind | undefined {
+  if (jobKind === "valuation.corelogic_avm") {
+    return "corelogic";
+  }
+  if (
+    (jobKind === "valuation.lender" || jobKind === "pricing.lender") &&
+    lenderCode === "NAB"
+  ) {
+    return "lender_portal";
+  }
+  return undefined;
+}
+
+export function selectVaultSecret(
+  secrets: VaultSecretMeta[],
+  jobKind: JobKind,
+  lenderCode?: string,
+): VaultSecretMeta | undefined {
+  const kind = vaultKindForJob(jobKind, lenderCode);
+  if (!kind) return undefined;
+  return secrets.find((secret) => secret.kind === kind);
 }

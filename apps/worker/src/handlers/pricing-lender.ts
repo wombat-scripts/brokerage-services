@@ -2,6 +2,7 @@ import {
   appendJobAudit,
   computeLvr,
   pricingLenderInputSchema,
+  type CredentialVault,
   type Job,
   type PricingLenderInput,
   type PricingLenderOutput,
@@ -11,10 +12,12 @@ import type { JobStore } from "@wombat/store";
 import { fixturePricingOutput, PRAI_NAB_FIXTURE } from "../fixtures/prai-nab.js";
 import { isFixtureMode } from "../fixture-mode.js";
 import { touchJob } from "../jobs.js";
+import { requestPortalUnlock, vaultUnlockAuditDetail } from "../vault-unlock.js";
 
 export async function handlePricingLender(
   job: Job<unknown>,
   jobs: JobStore,
+  vault?: CredentialVault,
 ): Promise<Job<PricingLenderInput, PricingLenderOutput>> {
   const input = pricingLenderInputSchema.parse(job.input);
   const valuation = await jobs.get(input.valuationJobId);
@@ -54,15 +57,7 @@ export async function handlePricingLender(
   }
 
   if (!isFixtureMode(input)) {
-    return touchJob(job as Job<PricingLenderInput, PricingLenderOutput>, {
-      status: "awaiting_attended_mfa",
-      error: {
-        code: "AWAITING_ATTENDED_MFA",
-        message:
-          "Live lender pricing is out of Phase 1 scope. Set input.fixture=true or PHASE1_FIXTURES=true.",
-        retryable: true,
-      },
-    });
+    return pauseForVault(job, input, vault);
   }
 
   if (input.lenderCode !== PRAI_NAB_FIXTURE.lenderCode) {
@@ -84,6 +79,53 @@ export async function handlePricingLender(
       fixture: true,
       currentRateSource: input.currentRateSource ?? "notion_loan",
     }),
+  });
+}
+
+async function pauseForVault(
+  job: Job<unknown>,
+  input: PricingLenderInput,
+  vault?: CredentialVault,
+): Promise<Job<PricingLenderInput, PricingLenderOutput>> {
+  const typed = job as Job<PricingLenderInput, PricingLenderOutput>;
+  if (!vault) {
+    return fail(job, "VAULT_NOT_CONFIGURED", "CredentialVault is required for live lender pricing", true);
+  }
+  const unlock = await requestPortalUnlock({
+    vault,
+    job,
+    jobKind: "pricing.lender",
+    lenderCode: input.lenderCode,
+  });
+  if (unlock.outcome === "no_secret") {
+    return fail(
+      job,
+      "VAULT_SECRET_NOT_MAPPED",
+      `No vault secret mapped for pricing.lender ${input.lenderCode}`,
+      false,
+    );
+  }
+  if (unlock.outcome === "awaiting_attended_mfa") {
+    return touchJob(typed, {
+      status: "awaiting_attended_mfa",
+      error: {
+        code: "AWAITING_ATTENDED_MFA",
+        message:
+          "Lender portal unlock needs attended MFA. Live scrape is out of scope. Set input.fixture=true or PHASE1_FIXTURES=true.",
+        retryable: true,
+      },
+      audit: appendJobAudit(job, "system", "vault.unlock", vaultUnlockAuditDetail(unlock)),
+    });
+  }
+  return touchJob(typed, {
+    status: "failed",
+    finishedAt: new Date().toISOString(),
+    error: {
+      code: "LIVE_PORTAL_OUT_OF_SCOPE",
+      message: "Vault TOTP path is ready; live lender scrape is out of Phase 1.3 scope.",
+      retryable: true,
+    },
+    audit: appendJobAudit(job, "system", "vault.unlock", vaultUnlockAuditDetail(unlock)),
   });
 }
 
