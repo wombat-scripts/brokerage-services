@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     template: "%s · Wombat Desk",
   },
   description:
-    "Ops console for Opportunity Matrix work. Fixture book. Saving Yes is a flag for Tom, not advice.",
+    "Ops console for Opportunity Matrix work. Fixture book by default. Saving Yes is a flag for Tom, not advice.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

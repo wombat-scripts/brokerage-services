@@ -40,13 +40,13 @@ pnpm typecheck
 pnpm test
 ```
 
-Wombat Desk (ops UI, fixtures only):
+Wombat Desk (ops UI, fixtures by default):
 
 ```bash
 pnpm dev:web
 ```
 
-Open http://localhost:3001 for the Desk tools hub, then `/matrix` for Prai × NAB Saving Yes. Details: `apps/web/README.md`.
+Open http://localhost:3001 for the Desk tools hub, then `/matrix` for Prai × NAB Saving Yes. Set `DESK_API_BASE_URL=http://127.0.0.1:3000` to read Andre’s Phase 1.1 Desk API instead. Details: `apps/web/README.md`.
 
 Tests use the in-memory store and a mocked Notion adapter. They do **not** need Postgres, Bitwarden, or a Notion token.
 

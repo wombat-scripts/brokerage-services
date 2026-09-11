@@ -22,8 +22,8 @@ export default async function RunsPage({
         <div>
           <h1>Run history</h1>
           <p>
-            Append-only Opportunity Runs for a loan. Oldest stays. Void would need a reason. This
-            list is the fixture book, not Postgres.
+            Append-only Opportunity Runs for a loan. Oldest stays. Void would need a reason.
+            Default is the fixture book. Set <code>DESK_API_BASE_URL</code> to read the API.
           </p>
         </div>
       </div>
